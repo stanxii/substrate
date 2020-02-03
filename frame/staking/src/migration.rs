@@ -111,6 +111,8 @@ pub mod inner {
 		}
 	}
 
+	// TODO TODO migration of CurrentEraStart
+
 	pub(super) fn perform_migrations<T: Trait>() {
 		<Module<T> as Store>::StorageVersion::mutate(|version| {
 			if *version < MIN_SUPPORTED_VERSION {
