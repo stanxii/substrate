@@ -234,7 +234,8 @@ impl<T: Trait> Time for Module<T> {
 	type Moment = T::Moment;
 
 	fn year() -> Self::Moment {
-		<T::Moment as SaturatedConversion>::saturated_from(1000u128 * 3600 * 24 * 36525 / 100)
+		// = 1000 * 3600 * 24 * 36525 / 100
+		(10 * 3600 * 24 * 36525).into()
 	}
 
 	fn now() -> Self::Moment {
