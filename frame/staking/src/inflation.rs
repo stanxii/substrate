@@ -27,17 +27,16 @@ use sp_runtime::{Perbill, traits::SimpleArithmetic, curve::PiecewiseLinear};
 /// `payout = yearly_inflation(npos_token_staked / total_tokens) * total_tokans / era_per_year`
 ///
 /// `era_duration` is expressed in millisecond.
-pub fn compute_total_payout<N, Time>(
+pub fn compute_total_payout<N>(
 	yearly_inflation: &PiecewiseLinear<'static>,
 	npos_token_staked: N,
 	total_tokens: N,
-	era_duration: Time::Moment
-) -> (N, N)
-	where
-		N: SimpleArithmetic + Clone,
-		Time: frame_support::traits::Time,
-{
-	let portion = Perbill::from_rational_approximation(era_duration, Time::year());
+	era_duration: u64
+) -> (N, N) where N: SimpleArithmetic + Clone {
+	// Milliseconds per year for the Julian year (365.25 days).
+	const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+
+	let portion = Perbill::from_rational_approximation(era_duration as u64, MILLISECONDS_PER_YEAR);
 	let payout = portion * yearly_inflation.calculate_for_fraction_times_denominator(
 		npos_token_staked,
 		total_tokens.clone(),

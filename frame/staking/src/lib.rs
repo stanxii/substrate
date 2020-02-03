@@ -271,8 +271,8 @@ use sp_runtime::{
 	RuntimeDebug,
 	curve::PiecewiseLinear,
 	traits::{
-		Convert, Zero, One, StaticLookup, CheckedSub, Saturating, Bounded, SimpleArithmetic,
-		EnsureOrigin,
+		Convert, Zero, One, StaticLookup, CheckedSub, Saturating, Bounded, SaturatedConversion,
+		SimpleArithmetic, EnsureOrigin,
 	}
 };
 use sp_staking::{
@@ -1384,11 +1384,12 @@ impl<T: Trait> Module<T> {
 			let validator_len: BalanceOf<T> = (validators.len() as u32).into();
 			let total_rewarded_stake = Self::slot_stake() * validator_len;
 
-			let (total_payout, max_payout) = inflation::compute_total_payout::<_, T::Time>(
+			let (total_payout, max_payout) = inflation::compute_total_payout(
 				&T::RewardCurve::get(),
 				total_rewarded_stake.clone(),
 				T::Currency::total_issuance(),
-				era_duration,
+				// Duration of era; more than u64::MAX is rewarded as u64::MAX.
+				era_duration.saturated_into::<u64>(),
 			);
 
 			let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();

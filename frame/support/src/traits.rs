@@ -653,15 +653,9 @@ bitmask! {
 	}
 }
 
-/// Trait to deals with time.
 pub trait Time {
-	/// Type for the time.
 	type Moment: SimpleArithmetic + Parameter + Default + Copy;
 
-	/// Duration for a Julian year (365.25 days).
-	fn year() -> Self::Moment;
-
-	/// Return current moment.
 	fn now() -> Self::Moment;
 }
 

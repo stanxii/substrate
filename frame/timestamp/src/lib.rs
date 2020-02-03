@@ -227,17 +227,10 @@ impl<T: Trait> ProvideInherent for Module<T> {
 	}
 }
 
-/// Before the timestamp inherent is applied, it returns the moment of previous block.
-///
-/// On genesis the moment returned is not valid.
 impl<T: Trait> Time for Module<T> {
 	type Moment = T::Moment;
 
-	fn year() -> Self::Moment {
-		// = 1000 * 3600 * 24 * 36525 / 100
-		(10 * 3600 * 24 * 36525).into()
-	}
-
+	/// Before the first set of now with inherent the value returned is zero.
 	fn now() -> Self::Moment {
 		Self::now()
 	}
