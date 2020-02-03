@@ -262,7 +262,7 @@ use frame_support::{
 	weights::SimpleDispatchInfo,
 	traits::{
 		Currency, OnFreeBalanceZero, LockIdentifier, LockableCurrency,
-		WithdrawReasons, OnUnbalanced, Imbalance, Get, Time
+		WithdrawReasons, OnUnbalanced, Imbalance, Get, UnixTime
 	}
 };
 use pallet_session::{historical::OnSessionEnding, SelectInitialValidators};
@@ -282,6 +282,8 @@ use sp_staking::{
 #[cfg(feature = "std")]
 use sp_runtime::{Serialize, Deserialize};
 use frame_system::{self as system, ensure_signed, ensure_root};
+#[cfg(feature="migrate")]
+use frame_support::traits::Time;
 
 use sp_phragmen::ExtendedBalance;
 
@@ -550,6 +552,8 @@ type PositiveImbalanceOf<T> =
 	<<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> =
 	<<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::NegativeImbalance;
+
+#[cfg(feature="migrate")]
 type MomentOf<T> = <<T as Trait>::Time as Time>::Moment;
 
 /// Means for interacting with a specialized version of the `session` trait.
@@ -596,8 +600,12 @@ pub trait Trait: frame_system::Trait {
 	/// The staking balance.
 	type Currency: LockableCurrency<Self::AccountId, Moment=Self::BlockNumber>;
 
-	/// Time used for computing era duration.
+	/// Time used for migrating CurrentEraStart.
+	#[cfg(feature="migrate")]
 	type Time: Time;
+
+	/// Time used for computing era duration.
+	type UnixTime: UnixTime;
 
 	/// Convert a balance into a number used for election calculation.
 	/// This must fit into a `u64` but is allowed to be sensibly lossy.
@@ -702,7 +710,7 @@ decl_storage! {
 		pub CurrentEra get(fn current_era) config(): EraIndex;
 
 		/// The start of the current era.
-		pub CurrentEraStart get(fn current_era_start): MomentOf<T>;
+		pub CurrentEraStart get(fn current_era_start): u64;
 
 		/// The session index at which the current era started.
 		pub CurrentEraStartSessionIndex get(fn current_era_start_session_index): SessionIndex;
@@ -851,8 +859,9 @@ decl_module! {
 
 		fn on_finalize() {
 			// Set the start of the first era.
-			if !<CurrentEraStart<T>>::exists() {
-				<CurrentEraStart<T>>::put(T::Time::now());
+			if !CurrentEraStart::exists() {
+				let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
+				CurrentEraStart::put(now_as_millis_u64);
 			}
 		}
 
@@ -1373,12 +1382,14 @@ impl<T: Trait> Module<T> {
 	fn new_era(start_session_index: SessionIndex) -> Option<Vec<T::AccountId>> {
 		// Payout
 		let points = CurrentEraPointsEarned::take();
-		let now = T::Time::now();
-		let previous_era_start = <CurrentEraStart<T>>::mutate(|v| {
-			sp_std::mem::replace(v, now)
+		let now = T::UnixTime::now();
+		let previous_era_start = CurrentEraStart::mutate(|v| {
+			let now_as_millis_u64 = now.as_millis().saturated_into();
+			let previous_era_start = sp_std::mem::replace(v, now_as_millis_u64);
+			core::time::Duration::from_millis(previous_era_start)
 		});
 		let era_duration = now - previous_era_start;
-		if !era_duration.is_zero() {
+		if era_duration != core::time::Duration::from_secs(0) {
 			let validators = Self::current_elected();
 
 			let validator_len: BalanceOf<T> = (validators.len() as u32).into();
@@ -1389,7 +1400,7 @@ impl<T: Trait> Module<T> {
 				total_rewarded_stake.clone(),
 				T::Currency::total_issuance(),
 				// Duration of era; more than u64::MAX is rewarded as u64::MAX.
-				era_duration.saturated_into::<u64>(),
+				era_duration.as_millis().saturated_into(),
 			);
 
 			let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
