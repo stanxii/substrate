@@ -20,7 +20,7 @@
 pub type VersionNumber = u32;
 
 // the current expected version of the storage
-pub const CURRENT_VERSION: VersionNumber = 2;
+pub const CURRENT_VERSION: VersionNumber = 3;
 
 /// The inner logic of migrations.
 #[cfg(any(test, feature = "migrate"))]
