@@ -769,6 +769,8 @@ decl_storage! {
 		config(stakers):
 			Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId>)>;
 		build(|config: &GenesisConfig<T>| {
+			StorageVersion::put(migration::CURRENT_VERSION);
+
 			for &(ref stash, ref controller, balance, ref status) in &config.stakers {
 				assert!(
 					T::Currency::free_balance(&stash) >= balance,
@@ -795,8 +797,6 @@ decl_storage! {
 					}, _ => Ok(())
 				};
 			}
-
-			StorageVersion::put(migration::CURRENT_VERSION);
 		});
 	}
 }
