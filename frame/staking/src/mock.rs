@@ -748,7 +748,8 @@ pub fn horrible_phragmen_with_post_processing(
 
 	// self stake
 	<Validators<Test>>::enumerate().for_each(|(who, _p)| {
-		*backing_stake_of.entry(who).or_insert(Zero::zero()) += Staking::slashable_balance_of(&who)
+		*backing_stake_of.entry(who).or_insert(Zero::zero()) +=
+			Staking::slashable_balance_of(&who)
 	});
 
 	// add nominator stuff

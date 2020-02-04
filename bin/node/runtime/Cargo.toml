@@ -58,6 +58,7 @@ pallet-recovery = { version = "2.0.0", default-features = false, path = "../../.
 pallet-session = { version = "2.0.0", features = ["historical"], path = "../../../frame/session", default-features = false }
 pallet-staking = { version = "2.0.0", features = ["migrate"], path = "../../../frame/staking", default-features = false }
 pallet-staking-reward-curve = { version = "2.0.0",  path = "../../../frame/staking/reward-curve" }
+pallet-staking-benchmarking-runtime-api = { version = "2.0.0", default-features = false, path = "../../../frame/staking/benchmarking-runtime-api/" }
 pallet-sudo = { version = "2.0.0", default-features = false, path = "../../../frame/sudo" }
 pallet-society = { version = "2.0.0", default-features = false, path = "../../../frame/society" }
 pallet-timestamp = { version = "2.0.0", default-features = false, path = "../../../frame/timestamp" }
@@ -111,6 +112,7 @@ std = [
 	"sp-runtime/std",
 	"sp-staking/std",
 	"pallet-staking/std",
+	"pallet-staking-benchmarking-runtime-api/std",
 	"sp-keyring",
 	"sp-session/std",
 	"pallet-sudo/std",

@@ -1318,6 +1318,12 @@ pub trait BlockIdTo<Block: self::Block> {
 	) -> Result<Option<NumberFor<Block>>, Self::Error>;
 }
 
+/// The module benchmarking trait.
+pub trait Benchmarking<T, U> {
+	/// Run the benchmarks for this module.
+	fn run_benchmark(parameters: Vec<(T, u32)>, repeat: u32) -> Vec<U>;
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;

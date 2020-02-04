@@ -255,6 +255,7 @@ mod migration;
 pub mod slashing;
 pub mod offchain_election;
 pub mod inflation;
+mod benchmarking;
 
 use sp_std::{prelude::*, result, convert::{TryInto, From}};
 use codec::{HasCompact, Encode, Decode};
@@ -1088,7 +1089,6 @@ decl_module! {
 			_signature: <T::KeyType as RuntimeAppPublic>::Signature,
 		) {
 			ensure_none(origin)?;
-			Encode::encode(&_signature);
 			Self::check_and_replace_solution(
 				winners,
 				compact_assignments,
@@ -2361,4 +2361,3 @@ impl<T: Trait> frame_support::unsigned::ValidateUnsigned for Module<T> {
 		}
 	}
 }
-

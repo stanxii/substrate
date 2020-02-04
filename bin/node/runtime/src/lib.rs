@@ -30,12 +30,14 @@ use sp_core::u32_trait::{_1, _2, _3, _4};
 use node_primitives::{AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, Moment, Signature};
 use sp_api::impl_runtime_apis;
 use sp_runtime::{
-	Permill, Perbill, Percent, ApplyExtrinsicResult, impl_opaque_keys, generic, create_runtime_str
+	Permill, Perbill, Percent, ApplyExtrinsicResult, impl_opaque_keys, generic, create_runtime_str,
+	BenchmarkResult, BenchmarkParameter,
 };
 use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::transaction_validity::TransactionValidity;
 use sp_runtime::traits::{
 	self, BlakeTwo256, Block as BlockT, StaticLookup, SaturatedConversion, ConvertInto, OpaqueKeys,
+	Benchmarking,
 };
 use sp_version::RuntimeVersion;
 #[cfg(any(feature = "std", test))]
@@ -210,7 +212,7 @@ impl pallet_indices::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const ExistentialDeposit: Balance = 1 * DOLLARS;
+	pub const ExistentialDeposit: Balance = 1 * MILLICENTS;
 	pub const CreationFee: Balance = 1 * CENTS;
 }
 
@@ -810,6 +812,26 @@ impl_runtime_apis! {
 			encoded: Vec<u8>,
 		) -> Option<Vec<(Vec<u8>, sp_core::crypto::KeyTypeId)>> {
 			SessionKeys::decode_into_raw_public_keys(&encoded)
+		}
+	}
+
+	impl pallet_identity::IdentityBenchmarks<Block> for Runtime {
+		fn run_benchmark(parameters: Vec<(BenchmarkParameter, u32)>, repeat: u32) -> Vec<BenchmarkResult> {
+			Identity::run_benchmark(parameters, repeat)
+		}
+
+		fn get_components() -> Vec<(BenchmarkParameter, u32, u32)> {
+			pallet_identity::benchmarking::set_identity::components()
+		}
+	}
+
+	impl pallet_staking_benchmarking_runtime_api::StakingBenchmark<
+		Block,
+		Vec<(BenchmarkParameter, u32)>,
+		Vec<BenchmarkResult>,
+	> for Runtime {
+		fn run_benchmark(parameters: Vec<(BenchmarkParameter, u32)>, repeat: u32) -> Vec<BenchmarkResult> {
+			Staking::run_benchmark(parameters, repeat)
 		}
 	}
 }

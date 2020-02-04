@@ -20,6 +20,10 @@ pallet-session = { version = "2.0.0", features = ["historical"], path = "../sess
 pallet-authorship = { version = "2.0.0", default-features = false, path = "../authorship" }
 sp-application-crypto = { version = "2.0.0", default-features = false, path = "../../primitives/application-crypto" }
 
+pallet-indices = { version = "2.0.0", default-features = false, path = "../indices" }
+rand = { version = "0.7", default-features = false }
+rand_chacha = { version = "0.2", default-features = false }
+
 [dev-dependencies]
 sp-core = { version = "2.0.0", path = "../../primitives/core", features = ["full_crypto"] }
 pallet-balances = { version = "2.0.0", path = "../balances" }
@@ -44,4 +48,5 @@ std = [
 	"pallet-session/std",
 	"frame-system/std",
 	"pallet-authorship/std",
+	"pallet-indices/std",
 ]

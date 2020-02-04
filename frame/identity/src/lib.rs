@@ -69,14 +69,16 @@ use sp_std::prelude::*;
 use sp_std::{fmt::Debug, ops::Add, iter::once};
 use enumflags2::BitFlags;
 use codec::{Encode, Decode};
-use sp_runtime::{DispatchResult, RuntimeDebug};
-use sp_runtime::traits::{StaticLookup, EnsureOrigin, Zero, AppendZerosInput};
+use sp_runtime::{DispatchResult, RuntimeDebug, BenchmarkResult, BenchmarkParameter};
+use sp_runtime::traits::{StaticLookup, EnsureOrigin, Zero, AppendZerosInput, Dispatchable, Benchmarking};
 use frame_support::{
 	decl_module, decl_event, decl_storage, ensure, decl_error,
 	traits::{Currency, ReservableCurrency, OnUnbalanced, Get},
 	weights::SimpleDispatchInfo,
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
+
+pub mod benchmarking;
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
 type NegativeImbalanceOf<T> = <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::NegativeImbalance;
@@ -873,6 +875,35 @@ decl_module! {
 	}
 }
 
+impl<T: Trait> Benchmarking<BenchmarkParameter, BenchmarkResult> for Module<T> {
+	fn run_benchmark(parameters: Vec<(BenchmarkParameter, u32)>, repeat: u32) -> Vec<BenchmarkResult> {
+		let mut results: Vec<BenchmarkResult> = Vec::new();
+
+		for r in 0..repeat {
+			sp_std::if_std!{
+				println!("REPEAT {:?}", r);
+			}
+			let (call, caller) = benchmarking::set_identity::instance::<T>(&parameters);
+			let start = sp_io::benchmarking::current_time();
+			assert_eq!(call.dispatch(frame_system::RawOrigin::Signed(caller).into()), Ok(()));
+			let finish = sp_io::benchmarking::current_time();
+			results.push(finish - start);
+			benchmarking::set_identity::clean::<T>();
+		}
+
+		return results;
+	}
+}
+
+sp_api::decl_runtime_apis! {
+	pub trait IdentityBenchmarks
+	{
+		fn run_benchmark(parameters: Vec<(BenchmarkParameter, u32)>, repeat: u32) -> Vec<BenchmarkResult>;
+
+		fn get_components() -> Vec<(BenchmarkParameter, u32, u32)>;
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -880,7 +911,7 @@ mod tests {
 	use sp_runtime::traits::BadOrigin;
 	use frame_support::{
 		assert_ok, assert_noop, impl_outer_origin, parameter_types, weights::Weight,
-		ord_parameter_types
+		ord_parameter_types,
 	};
 	use sp_core::H256;
 	use frame_system::EnsureSignedBy;
