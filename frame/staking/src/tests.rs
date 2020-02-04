@@ -2803,3 +2803,20 @@ fn zero_slash_keeps_nominators() {
 		assert!(nominations.submitted_in >= last_slash);
 	});
 }
+
+#[test]
+fn migration_v3() {
+	ExtBuilder::default().build().execute_with(|| {
+		Timestamp::set_timestamp(10);
+		<Staking as Store>::StorageVersion::put(2);
+
+		let hashed_key = <Staking as Store>::CurrentEraStart::hashed_key();
+		frame_support::storage::unhashed::put(&hashed_key, &0u64);
+
+		// perform migration.
+		<Staking as Store>::StorageVersion::put(2);
+		crate::migration::inner::to_v3::<Test>(&mut 2);
+
+		assert_eq!(<Staking as Store>::CurrentEraStart::get(), 10);
+	});
+}

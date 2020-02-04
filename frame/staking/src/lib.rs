@@ -282,8 +282,6 @@ use sp_staking::{
 #[cfg(feature = "std")]
 use sp_runtime::{Serialize, Deserialize};
 use frame_system::{self as system, ensure_signed, ensure_root};
-#[cfg(feature="migrate")]
-use frame_support::traits::Time;
 
 use sp_phragmen::ExtendedBalance;
 use frame_support::traits::OnReapAccount;
@@ -554,9 +552,6 @@ type PositiveImbalanceOf<T> =
 type NegativeImbalanceOf<T> =
 	<<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::NegativeImbalance;
 
-#[cfg(feature="migrate")]
-type MomentOf<T> = <<T as Trait>::Time as Time>::Moment;
-
 /// Means for interacting with a specialized version of the `session` trait.
 ///
 /// This is needed because `Staking` sets the `ValidatorIdOf` of the `pallet_session::Trait`
@@ -599,10 +594,6 @@ impl<T: Trait> SessionInterface<<T as frame_system::Trait>::AccountId> for T whe
 pub trait Trait: frame_system::Trait {
 	/// The staking balance.
 	type Currency: LockableCurrency<Self::AccountId, Moment=Self::BlockNumber>;
-
-	/// Time used for migrating CurrentEraStart.
-	#[cfg(feature="migrate")]
-	type Time: Time;
 
 	/// Time used for computing era duration.
 	type UnixTime: UnixTime;
@@ -713,7 +704,7 @@ decl_storage! {
 		/// The current era index.
 		pub CurrentEra get(fn current_era) config(): EraIndex;
 
-		/// The start of the current era.
+		/// The start of the current era as millisecond from UNIX_EPOCH.
 		pub CurrentEraStart get(fn current_era_start): u64;
 
 		/// The session index at which the current era started.

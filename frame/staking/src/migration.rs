@@ -26,9 +26,10 @@ pub const CURRENT_VERSION: VersionNumber = 2;
 #[cfg(any(test, feature = "migrate"))]
 pub mod inner {
 	use crate::{Store, Module, Trait};
-	use frame_support::{StorageLinkedMap, StoragePrefixedMap, StorageValue};
+	use frame_support::{StorageLinkedMap, StoragePrefixedMap, StorageValue, traits::UnixTime};
 	use codec::{Encode, Decode};
 	use sp_std::vec::Vec;
+	use sp_runtime::traits::SaturatedConversion;
 	use super::{CURRENT_VERSION, VersionNumber};
 
 	// the minimum supported version of the migration logic.
@@ -111,7 +112,14 @@ pub mod inner {
 		}
 	}
 
-	// TODO TODO migration of CurrentEraStart
+	// migrate storage from v2 to v3: Insert into CurrentEraStart the current time.
+	pub fn to_v3<T: Trait>(version: &mut VersionNumber) {
+		if *version != 2 { return }
+		*version += 1;
+
+		let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
+		<Module<T> as Store>::CurrentEraStart::put(now_as_millis_u64);
+	}
 
 	pub(super) fn perform_migrations<T: Trait>() {
 		<Module<T> as Store>::StorageVersion::mutate(|version| {
@@ -126,6 +134,7 @@ pub mod inner {
 
 			to_v1::<T>(version);
 			to_v2::<T>(version);
+			to_v3::<T>(version);
 		});
 	}
 }
