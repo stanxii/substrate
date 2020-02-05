@@ -57,6 +57,7 @@ use params::{
 pub use params::{
 	SharedParams, ImportParams, ExecutionStrategy, Subcommand, RunCmd, BuildSpecCmd,
 	ExportBlocksCmd, ImportBlocksCmd, CheckBlockCmd, PurgeChainCmd, RevertCmd,
+	BenchmarkCmd,
 };
 pub use traits::GetSharedParams;
 use app_dirs::{AppInfo, AppDataType};

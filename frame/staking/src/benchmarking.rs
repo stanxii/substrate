@@ -1,5 +1,5 @@
 use super::*;
-use sp_runtime::{BenchmarkParameter, BenchmarkResult};
+use sp_runtime::{BenchmarkParameter, BenchmarkResults};
 use sp_runtime::traits::{Dispatchable, Convert, Benchmarking};
 use sp_io::hashing::blake2_256;
 use sp_std::convert::TryInto;
@@ -222,27 +222,30 @@ pub enum BenchmarkingMode {
 	WeakerSubmission,
 }
 
-impl<T: Trait> Benchmarking<BenchmarkParameter, BenchmarkResult> for Module<T> where
-	T::Lookup: StaticLookup<Source=AddressOf<T>>,
-{
-	fn run_benchmark(parameters: Vec<(BenchmarkParameter, u32)>, repeat: u32) -> Vec<BenchmarkResult> {
-		let mut results: Vec<BenchmarkResult> = Vec::new();
+impl<T: Trait> Benchmarking<u128> for Module<T> where T::Lookup: StaticLookup<Source=AddressOf<T>> {
+	const STEPS: u32 = 1;
+	const REPEATS: u32 = 1;
 
-		let param = |x| parameters.iter().find(|&p| p.0 == x).map(|p| p.1).expect("Unexpected param");
+	fn run_benchmarks() -> Vec<u128> {
+		let mut results: Vec<u128> = Vec::new();
+
+		// let param = |x| parameters.iter().find(|&p| p.0 == x).map(|p| p.1).expect("Unexpected param");
 
 		// Just set this once.
 		<EraElectionStatus<T>>::put(ElectionStatus::Open(T::BlockNumber::from(1u32)));
 
-		for _r in 0..repeat {
-			sp_std::if_std! {
-				println!("Repeat std {}", _r);
-			}
-			let num_stakers = param(BenchmarkParameter::S);
-			let num_voters = param(BenchmarkParameter::V);
-			let edge_per_voter = param(BenchmarkParameter::E);
-			let mode: BenchmarkingMode = unsafe {
-				sp_std::mem::transmute(param(BenchmarkParameter::M))
-			};
+		for _r in 0..Self::REPEATS {
+			let num_stakers = 300;
+			let num_voters = 600;
+			let edge_per_voter = 12;
+			let mode: BenchmarkingMode = BenchmarkingMode::StrongerSubmission;
+
+			// let num_stakers = param(BenchmarkParameter::S);
+			// let num_voters = param(BenchmarkParameter::V);
+			// let edge_per_voter = param(BenchmarkParameter::E);
+			// let mode: BenchmarkingMode = unsafe {
+			// 	sp_std::mem::transmute(param(BenchmarkParameter::M))
+			// };
 
 			// stake and nominate everyone
 			setup_with_no_solution_on_chain::<T>(num_stakers, num_voters, edge_per_voter);
@@ -281,26 +284,21 @@ impl<T: Trait> Benchmarking<BenchmarkParameter, BenchmarkResult> for Module<T> w
 			};
 
 			sp_std::if_std! {
-				println!("Rest is also done. Mode = {:?}", mode);
+				println!("Setup is done. Mode = {:?} iter {}", mode, _r);
 			}
 
 			let call = crate::Call::<T>::submit_election_solution(
 				winners,
 				compact,
 			);
+
 			let start = sp_io::benchmarking::current_time();
-			sp_std::if_std! {
-				println!("Repeat std {}", _r);
-			}
-			sp_runtime::print("Repeat");
-			sp_runtime::print(_r);
 			assert_ok!(call.dispatch(signed_account::<T>(USER)));
 			let finish = sp_io::benchmarking::current_time();
-			results.push(finish - start);
 
+			results.push(finish - start);
 			clean::<T>();
 		}
-
 		results
 	}
 }
