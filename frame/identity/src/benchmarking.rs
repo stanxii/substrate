@@ -20,7 +20,7 @@ use super::*;
 
 use frame_system::RawOrigin;
 use sp_io::hashing::blake2_256;
-use sp_runtime::{BenchmarkResults, BenchmarkParameter};
+use sp_runtime::{BenchmarkResults, BenchmarkParameter, RuntimeString};
 use sp_runtime::traits::{Bounded, Benchmarking};
 
 use crate::Module as Identity;
@@ -139,6 +139,16 @@ enum SelectedBenchmark {
 	AddRegistrar,
 }
 
+impl From<RuntimeString> for SelectedBenchmark {
+	fn from(v: RuntimeString) -> SelectedBenchmark {
+		match v.as_ref() {
+			b"SetIdentity" => SelectedBenchmark::SetIdentity,
+			b"AddRegistrar" => SelectedBenchmark::AddRegistrar,
+			_ => SelectedBenchmark::SetIdentity,
+		}
+	}
+}
+
 impl<T: Trait> BenchmarkingSetup<T> for SelectedBenchmark {
 	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)>
 	{
@@ -161,9 +171,8 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> {
 	const STEPS: u32 = 10;
 	const REPEATS: u32 = 100;
 
-	fn run_benchmarks() -> Vec<BenchmarkResults> {
-
-		let selected_benchmark = SelectedBenchmark::SetIdentity;
+	fn run_benchmarks(benchmark: RuntimeString) -> Vec<BenchmarkResults> {
+		let selected_benchmark: SelectedBenchmark= From::from(benchmark);
 		// first one is set_identity.		
 		let components = <SelectedBenchmark as BenchmarkingSetup<T>>::components(&selected_benchmark);
 		// results go here
@@ -205,6 +214,6 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> {
 sp_api::decl_runtime_apis! {
 	pub trait IdentityBenchmarks
 	{
-		fn run_benchmarks() -> Vec<BenchmarkResults>;
+		fn run_benchmarks(benchmark: RuntimeString) -> Vec<BenchmarkResults>;
 	}
 }

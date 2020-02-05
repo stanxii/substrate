@@ -22,7 +22,7 @@ use crate::error::Error;
 use sc_chain_spec::{ChainSpec, RuntimeGenesis, Extension};
 use log::{warn, info};
 use futures::{future, prelude::*};
-use sp_runtime::{BuildStorage, traits::{
+use sp_runtime::{BuildStorage, RuntimeString, traits::{
 		Block as BlockT, NumberFor, One, Zero, Header, SaturatedConversion
 	}
 };
@@ -51,6 +51,8 @@ pub fn benchmark_runtime<TBl, TExecDisp, G, E> (
 	spec: ChainSpec<G, E>,
 	strategy: ExecutionStrategy,
 	wasm_method: WasmExecutionMethod,
+	module: String,
+	benchmark: String,
 ) -> error::Result<()> where
 	TBl: BlockT,
 	TExecDisp: NativeExecutionDispatch + 'static,
@@ -64,13 +66,14 @@ pub fn benchmark_runtime<TBl, TExecDisp, G, E> (
 		wasm_method,
 		None, // heap pages
 	);
+	let entry: String = module + "_run_benchmarks";
 	let result = StateMachine::<_, _, NumberFor<TBl>, _>::new(
 		&state,
 		None,
 		&mut changes,
 		&executor,
-		"IdentityBenchmarks_run_benchmarks",
-		&[],
+		&entry,
+		&RuntimeString::Owned(benchmark).encode(),
 		Default::default(),
 	).execute(strategy).map_err(|e| format!("Error executing runtime benchmark: {:?}", e))?;
 	println!("{:?}", result);

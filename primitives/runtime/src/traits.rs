@@ -29,6 +29,7 @@ use crate::transaction_validity::{
 	ValidTransaction, TransactionValidity, TransactionValidityError, UnknownTransaction,
 };
 use crate::generic::{Digest, DigestItem};
+use crate::RuntimeString;
 pub use sp_arithmetic::traits::{
 	SimpleArithmetic, UniqueSaturatedInto, UniqueSaturatedFrom, Saturating, SaturatedConversion,
 	Zero, One, Bounded, CheckedAdd, CheckedSub, CheckedMul, CheckedDiv,
@@ -1324,7 +1325,7 @@ pub trait Benchmarking<T> {
 	const REPEATS: u32;
 
 	/// Run the benchmarks for this module.
-	fn run_benchmarks() -> Vec<T>;
+	fn run_benchmarks(benchmark: RuntimeString) -> Vec<T>;
 }
 
 #[cfg(test)]
