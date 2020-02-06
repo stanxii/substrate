@@ -5,7 +5,9 @@ use sp_io::hashing::blake2_256;
 use frame_support::{StoragePrefixedMap, StorageValue};
 use pallet_indices::address::Address;
 use frame_system::RawOrigin;
-use sp_phragmen::{ExtendedBalance, StakedAssignment, reduce};
+use sp_phragmen::{
+	ExtendedBalance, StakedAssignment, reduce, build_support_map, evaluate_support, PhragmenScore,
+};
 
 macro_rules! assert_ok {
 	( $x:expr $(,)? ) => {
@@ -113,7 +115,7 @@ fn setup_with_no_solution_on_chain<T: Trait>(
 }
 
 fn get_weak_solution<T: Trait>()
--> (Vec<T::AccountId>, CompactAssignments<T::AccountId, ExtendedBalance>) {
+-> (Vec<T::AccountId>, CompactAssignments<T::AccountId, ExtendedBalance>, PhragmenScore) {
 	use sp_std::collections::btree_map::BTreeMap;
 	let mut backing_stake_of: BTreeMap<T::AccountId, BalanceOf<T>> = BTreeMap::new();
 
@@ -178,14 +180,15 @@ fn get_weak_solution<T: Trait>()
 		});
 	});
 
-	// submit it
-	let compact = <CompactAssignments<T::AccountId, ExtendedBalance>>::from_staked(assignments);
+	let support = build_support_map::<T::AccountId>(&winners, &assignments).0;
+	let score = evaluate_support(&support);
 
-	(winners, compact)
+	let compact = <CompactAssignments<T::AccountId, ExtendedBalance>>::from_staked(assignments);
+	(winners, compact, score)
 }
 
 fn get_seq_phragmen_solution<T: Trait>()
--> (Vec<T::AccountId>, CompactAssignments<T::AccountId, ExtendedBalance>) {
+-> (Vec<T::AccountId>, CompactAssignments<T::AccountId, ExtendedBalance>, PhragmenScore) {
 	let sp_phragmen::PhragmenResult {
 		winners,
 		assignments,
@@ -194,13 +197,15 @@ fn get_seq_phragmen_solution<T: Trait>()
 
 	let mut staked: Vec<StakedAssignment<T::AccountId>> = assignments
 		.into_iter()
-		.map(|a| a.into_staked::<_, _, T::CurrencyToVote>(<Module<T>>::slashable_balance_of))
+		.map(|a| a.into_staked::<_, _, T::CurrencyToVote>(<Module<T>>::slashable_balance_of, true))
 		.collect();
 
 	reduce(&mut staked);
-	let compact = <CompactAssignments<T::AccountId, ExtendedBalance>>::from_staked(staked);
+	let (support_map, _) = build_support_map::<T::AccountId>(&winners, &staked);
+	let score = evaluate_support::<T::AccountId>(&support_map);
 
-	(winners, compact)
+	let compact = <CompactAssignments<T::AccountId, ExtendedBalance>>::from_staked(staked);
+	(winners, compact, score)
 }
 
 fn clean<T: Trait>() {
@@ -245,29 +250,31 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 			// stake and nominate everyone
 			setup_with_no_solution_on_chain::<T>(num_stakers, num_voters, edge_per_voter);
 
-			let (winners, compact) = match mode {
+			let (winners, compact, score) = match mode {
 				BenchmarkingMode::InitialSubmission => {
 					/* No need to setup anything */
 					get_seq_phragmen_solution::<T>()
 				},
 				BenchmarkingMode::StrongerSubmission => {
-					let (winners, compact) = get_weak_solution::<T>();
+					let (winners, compact, score,) = get_weak_solution::<T>();
 					assert_ok!(
 						<Module<T>>::submit_election_solution(
 							signed_account::<T>(USER),
 							winners,
-							compact
+							compact,
+							score,
 						)
 					);
 					get_seq_phragmen_solution::<T>()
 				},
 				BenchmarkingMode::WeakerSubmission => {
-					let (winners, compact) = get_seq_phragmen_solution::<T>();
+					let (winners, compact, score) = get_seq_phragmen_solution::<T>();
 					assert_ok!(
 						<Module<T>>::submit_election_solution(
 							signed_account::<T>(USER),
 							winners,
-							compact
+							compact,
+							score,
 						)
 					);
 					get_weak_solution::<T>()
@@ -281,6 +288,7 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 			let call = crate::Call::<T>::submit_election_solution(
 				winners,
 				compact,
+				score,
 			);
 
 			let start = sp_io::benchmarking::current_time();
