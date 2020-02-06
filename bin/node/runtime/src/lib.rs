@@ -31,7 +31,7 @@ use node_primitives::{AccountId, AccountIndex, Balance, BlockNumber, Hash, Index
 use sp_api::impl_runtime_apis;
 use sp_runtime::{
 	Permill, Perbill, Percent, ApplyExtrinsicResult, impl_opaque_keys, generic, create_runtime_str,
-	BenchmarkResults, BenchmarkParameter,
+	BenchmarkResults,
 };
 use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::transaction_validity::TransactionValidity;
@@ -126,7 +126,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	// and set impl_version to 0. If only runtime
 	// implementation changes and behavior does not, then leave spec_version as
 	// is and increment impl_version.
-	spec_version: 212,
+	spec_version: 213,
 	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 };
@@ -815,19 +815,21 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl pallet_identity::IdentityBenchmarks<Block> for Runtime {
-		fn run_benchmarks() -> Vec<BenchmarkResults> {
-			Identity::run_benchmarks()
+	impl crate::Benchmark<Block> for Runtime {
+		fn dispatch_benchmark(module: Vec<u8>, extrinsic: Vec<u8>, steps: u32, repeat: u32) -> Vec<BenchmarkResults> {
+			match module.as_slice() {
+				b"pallet-identity" | b"identity" => Identity::run_benchmark(extrinsic, steps, repeat),
+				b"pallet-staking" | b"staking" => Staking::run_benchmark(extrinsic, steps, repeat),
+				_ => return Vec::new(),
+			}
 		}
 	}
+}
 
-	impl pallet_staking_benchmarking_runtime_api::StakingBenchmark<
-		Block,
-		Vec<u128>,
-	> for Runtime {
-		fn run_benchmarks() -> Vec<u128> {
-			Staking::run_benchmarks()
-		}
+sp_api::decl_runtime_apis! {
+	pub trait Benchmark
+	{
+		fn dispatch_benchmark(module: Vec<u8>, extrinsic: Vec<u8>, steps: u32, repeat: u32) -> Vec<BenchmarkResults>;
 	}
 }
 

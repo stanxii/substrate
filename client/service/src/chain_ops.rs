@@ -22,7 +22,9 @@ use crate::error::Error;
 use sc_chain_spec::{ChainSpec, RuntimeGenesis, Extension};
 use log::{warn, info};
 use futures::{future, prelude::*};
-use sp_runtime::{BuildStorage, traits::{
+use sp_runtime::{
+	BuildStorage, BenchmarkResults,
+	traits::{
 		Block as BlockT, NumberFor, One, Zero, Header, SaturatedConversion
 	}
 };
@@ -51,6 +53,10 @@ pub fn benchmark_runtime<TBl, TExecDisp, G, E> (
 	spec: ChainSpec<G, E>,
 	strategy: ExecutionStrategy,
 	wasm_method: WasmExecutionMethod,
+	pallet: String,
+	extrinsic: String,
+	steps: u32,
+	repeat: u32,
 ) -> error::Result<()> where
 	TBl: BlockT,
 	TExecDisp: NativeExecutionDispatch + 'static,
@@ -69,10 +75,11 @@ pub fn benchmark_runtime<TBl, TExecDisp, G, E> (
 		None,
 		&mut changes,
 		&executor,
-		"IdentityBenchmarks_run_benchmarks",
-		&[],
+		"Benchmark_dispatch_benchmark",
+		&(pallet, extrinsic, steps, repeat).encode(),
 		Default::default(),
 	).execute(strategy).map_err(|e| format!("Error executing runtime benchmark: {:?}", e))?;
+	let result = <Vec<BenchmarkResults> as Decode>::decode(&mut &result[..]);
 	println!("{:?}", result);
 	info!("Done.");
 	Ok(())

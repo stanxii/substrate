@@ -1,8 +1,7 @@
 use super::*;
-use sp_runtime::{BenchmarkParameter, BenchmarkResults};
+use sp_runtime::{BenchmarkResults};
 use sp_runtime::traits::{Dispatchable, Convert, Benchmarking};
 use sp_io::hashing::blake2_256;
-use sp_std::convert::TryInto;
 use frame_support::{StoragePrefixedMap, StorageValue};
 use pallet_indices::address::Address;
 use frame_system::RawOrigin;
@@ -217,42 +216,34 @@ fn clean<T: Trait>() {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum BenchmarkingMode {
+	/// Initial submission. This will be rather cheap
 	InitialSubmission,
+	/// A better submission that will replace the previous ones. This is the most expensive.
 	StrongerSubmission,
+	/// A weak submission that will be rejected. This will be rather cheap.
 	WeakerSubmission,
 }
 
-impl<T: Trait> Benchmarking<u128> for Module<T> where T::Lookup: StaticLookup<Source=AddressOf<T>> {
-	const STEPS: u32 = 1;
-	const REPEATS: u32 = 1;
-
-	fn run_benchmarks() -> Vec<u128> {
-		let mut results: Vec<u128> = Vec::new();
-
-		// let param = |x| parameters.iter().find(|&p| p.0 == x).map(|p| p.1).expect("Unexpected param");
+impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: StaticLookup<Source=AddressOf<T>> {
+	fn run_benchmark(_extrinsic: Vec<u8>, _steps: u32, repeat: u32) -> Vec<BenchmarkResults> {
+		let mut results: Vec<BenchmarkResults> = Vec::new();
 
 		// Just set this once.
 		<EraElectionStatus<T>>::put(ElectionStatus::Open(T::BlockNumber::from(1u32)));
+		frame_support::storage::unhashed::put_raw(
+			sp_core::storage::well_known_keys::HEAP_PAGES,
+			&1_000_000_000_000_000u64.encode(),
+		);
 
-		for _r in 0..Self::REPEATS {
+		for r in 0..repeat {
+			// TODO: randomly generate these.
 			let num_stakers = 300;
 			let num_voters = 600;
 			let edge_per_voter = 12;
 			let mode: BenchmarkingMode = BenchmarkingMode::StrongerSubmission;
 
-			// let num_stakers = param(BenchmarkParameter::S);
-			// let num_voters = param(BenchmarkParameter::V);
-			// let edge_per_voter = param(BenchmarkParameter::E);
-			// let mode: BenchmarkingMode = unsafe {
-			// 	sp_std::mem::transmute(param(BenchmarkParameter::M))
-			// };
-
 			// stake and nominate everyone
 			setup_with_no_solution_on_chain::<T>(num_stakers, num_voters, edge_per_voter);
-
-			sp_std::if_std! {
-				println!("state is set. Mode = {:?}", mode);
-			}
 
 			let (winners, compact) = match mode {
 				BenchmarkingMode::InitialSubmission => {
@@ -284,7 +275,7 @@ impl<T: Trait> Benchmarking<u128> for Module<T> where T::Lookup: StaticLookup<So
 			};
 
 			sp_std::if_std! {
-				println!("Setup is done. Mode = {:?} iter {}", mode, _r);
+				println!("Setup is done. Mode = {:?} iter {}/{}", mode, r, repeat);
 			}
 
 			let call = crate::Call::<T>::submit_election_solution(
@@ -296,33 +287,9 @@ impl<T: Trait> Benchmarking<u128> for Module<T> where T::Lookup: StaticLookup<So
 			assert_ok!(call.dispatch(signed_account::<T>(USER)));
 			let finish = sp_io::benchmarking::current_time();
 
-			results.push(finish - start);
+			results.push((Default::default(), finish - start));
 			clean::<T>();
 		}
 		results
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use crate::{Module};
-	use crate::mock::*;
-	use super::*;
-
-	use sp_runtime::traits::Benchmarking;
-
-	#[test]
-	fn basic_setup_works() {
-		let mut ext = sp_io::TestExternalities::new(Default::default());
-
-		ext.execute_with(|| {
-			let parameters = vec![
-				(BenchmarkParameter::S, 10),
-				(BenchmarkParameter::V, 10),
-				(BenchmarkParameter::E, 10),
-				(BenchmarkParameter::M, 0),
-			];
-			// TODO
-		})
 	}
 }

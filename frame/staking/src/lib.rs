@@ -255,6 +255,7 @@ mod migration;
 pub mod slashing;
 pub mod offchain_election;
 pub mod inflation;
+
 mod benchmarking;
 
 use sp_std::{prelude::*, result, convert::{TryInto, From}};
@@ -283,12 +284,13 @@ use sp_staking::{
 	SessionIndex,
 	offence::{OnOffenceHandler, OffenceDetails, Offence, ReportOffence},
 };
-#[cfg(feature = "std")]
-use sp_runtime::{Serialize, Deserialize};
 use frame_system::{
 	self as system, ensure_signed, ensure_root, ensure_none,
 	offchain::SubmitUnsignedTransaction,
 };
+#[cfg(feature = "std")]
+use sp_runtime::{Serialize, Deserialize};
+
 
 use sp_phragmen::{ExtendedBalance, StakedAssignment, generate_compact_solution_type};
 

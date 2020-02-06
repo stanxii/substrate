@@ -850,7 +850,19 @@ pub struct PurgeChainCmd {
 pub struct BenchmarkCmd {
 	/// Select a FRAME pallet to benchmark.
 	#[structopt(short, long)]
-	pub pallet: Option<String>,
+	pub pallet: String,
+
+	/// Select an extrinsic to benchmark.
+	#[structopt(short, long)]
+	pub extrinsic: String,
+
+	/// Select how many steps of the parameters should we test.
+	#[structopt(short, long, default_value = "1")]
+	pub steps: u32,
+
+	/// Select how many repetitions of this benchmark should run.
+	#[structopt(short, long, default_value = "1")]
+	pub repeat: u32,
 
 	#[allow(missing_docs)]
 	#[structopt(flatten)]
@@ -1245,7 +1257,11 @@ impl BenchmarkCmd {
 		let spec = config.chain_spec.expect("chain_spec is always Some");
 		let execution_strategy = self.execution.unwrap_or(ExecutionStrategy::Native).into();
 		let wasm_method = self.wasm_method.into();
-		sc_service::chain_ops::benchmark_runtime::<BB, BC::NativeDispatch, _, _>(spec, execution_strategy, wasm_method)?;
+		let pallet = self.pallet;
+		let extrinsic = self.extrinsic;
+		let steps = self.steps;
+		let repeat = self.repeat;
+		sc_service::chain_ops::benchmark_runtime::<BB, BC::NativeDispatch, _, _>(spec, execution_strategy, wasm_method, pallet, extrinsic, steps, repeat)?;
 		Ok(())
 	}
 }
