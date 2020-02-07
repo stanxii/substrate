@@ -63,6 +63,8 @@ pub fn benchmark_runtime<TBl, TExecDisp, G, E> (
 	G: RuntimeGenesis,
 	E: Extension,
 {
+	use separator::Separatable;
+
 	let genesis_storage = spec.build_storage()?;
 	let mut changes = Default::default();
 	let state = BenchmarkingState::<TBl>::new(genesis_storage)?;
@@ -80,7 +82,10 @@ pub fn benchmark_runtime<TBl, TExecDisp, G, E> (
 		Default::default(),
 	).execute(strategy).map_err(|e| format!("Error executing runtime benchmark: {:?}", e))?;
 	let result = <Vec<BenchmarkResults> as Decode>::decode(&mut &result[..]);
-	println!("{:?}", result);
+	result.iter().enumerate().for_each(|(i, res)| {
+		println!("## Bench #{}", i);
+		res.iter().enumerate().for_each(|(j, r)| println!("{}\t{}", j, r.1.separated_string()));
+	});
 	info!("Done.");
 	Ok(())
 }

@@ -164,10 +164,15 @@ impl<AccountId> Assignment<AccountId> {
 		}).collect::<Vec<(AccountId, ExtendedBalance)>>();
 
 		if fill {
-			// if leftover is zero it is effectless.
 			if let Some(leftover) = stake.checked_sub(sum) {
+				// if leftover is zero it is effectless.
 				if let Some(last) = distribution.last_mut() {
 					last.1 += leftover;
+				}
+			} else if let Some(excess) = sum.checked_sub(stake) {
+				// excess should really never be more than one or two.
+				if let Some(last) = distribution.last_mut() {
+					last.1 -= excess;
 				}
 			}
 		}
@@ -467,10 +472,10 @@ pub fn build_support_map<AccountId>(
 
 	// build support struct.
 	for StakedAssignment { who, distribution } in assignments.iter() {
-		for (c, weight_extended) in distribution.iter() {
+		for (c, weight) in distribution.iter() {
 			if let Some(support) = supports.get_mut(c) {
-				support.total = support.total.saturating_add(*weight_extended);
-				support.voters.push((who.clone(), *weight_extended));
+				support.total = support.total.checked_add(*weight).unwrap();
+				support.voters.push((who.clone(), *weight));
 			} else {
 				errors = errors.saturating_add(1);
 			}
@@ -495,12 +500,17 @@ pub fn evaluate_support<AccountId>(
 	// This must run on chain..
 	let mut sum_squared: ExtendedBalance = Zero::zero();
 	for (_, support) in support.iter() {
-		sum += support.total;
-		let squared = support.total.saturating_mul(support.total);
-		sum_squared = sum_squared.saturating_add(squared);
+		// score[0]
 		if support.total < min_support {
 			min_support = support.total;
 		}
+
+		// score[1]
+		sum += support.total;
+
+		// score[2]
+		let squared = support.total.saturating_mul(support.total);
+		sum_squared = sum_squared.saturating_add(squared);
 	}
 	[min_support, sum, sum_squared]
 }
