@@ -234,6 +234,10 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 	fn run_benchmark(_extrinsic: Vec<u8>, _steps: u32, repeat: u32) -> Vec<BenchmarkResults> {
 		let mut results: Vec<BenchmarkResults> = Vec::new();
 
+		// Warm up the DB?
+		sp_io::benchmarking::commit_db();
+		sp_io::benchmarking::wipe_db();
+
 		// Just set this once.
 		<EraElectionStatus<T>>::put(ElectionStatus::Open(T::BlockNumber::from(1u32)));
 		frame_support::storage::unhashed::put_raw(
@@ -295,9 +299,11 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 				score,
 			);
 
+			sp_io::benchmarking::commit_db();
 			let start = sp_io::benchmarking::current_time();
 			assert_ok!(call.dispatch(signed_account::<T>(USER)));
 			let finish = sp_io::benchmarking::current_time();
+			sp_io::benchmarking::wipe_db();
 
 			results.push((Default::default(), finish - start));
 		}
