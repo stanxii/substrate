@@ -238,14 +238,15 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 		sp_io::benchmarking::commit_db();
 		sp_io::benchmarking::wipe_db();
 
-		// Just set this once.
-		<EraElectionStatus<T>>::put(ElectionStatus::Open(T::BlockNumber::from(1u32)));
-		frame_support::storage::unhashed::put_raw(
-			sp_core::storage::well_known_keys::HEAP_PAGES,
-			&1_000_000_000_000_000u64.encode(),
-		);
-
 		for r in 0..repeat {
+
+			// Just set this once.
+			<EraElectionStatus<T>>::put(ElectionStatus::Open(T::BlockNumber::from(1u32)));
+			frame_support::storage::unhashed::put_raw(
+				sp_core::storage::well_known_keys::HEAP_PAGES,
+				&1_000_000_000_000_000u64.encode(),
+			);
+
 			// TODO: randomly generate these.
 			let num_stakers = 300;
 			let num_voters = 600;
