@@ -552,6 +552,50 @@ impl pallet_identity::Trait for Runtime {
 	type ForceOrigin = pallet_collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
 }
 
+impl pallet_benchmark::Trait for Runtime {
+	type Event = Event;
+}
+
+impl frame_system::offchain::CreateTransaction<Runtime, UncheckedExtrinsic> for Runtime {
+	type Public = <Signature as traits::Verify>::Signer;
+	type Signature = Signature;
+
+	fn create_transaction<TSigner: frame_system::offchain::Signer<Self::Public, Self::Signature>>(
+		call: Call,
+		public: Self::Public,
+		account: AccountId,
+		index: Index,
+	) -> Option<(Call, <UncheckedExtrinsic as traits::Extrinsic>::SignaturePayload)> {
+		// take the biggest period possible.
+		let period = BlockHashCount::get()
+			.checked_next_power_of_two()
+			.map(|c| c / 2)
+			.unwrap_or(2) as u64;
+		let current_block = System::block_number()
+			.saturated_into::<u64>()
+			// The `System::block_number` is initialized with `n+1`,
+			// so the actual block number is `n`.
+			.saturating_sub(1);
+		let tip = 0;
+		let extra: SignedExtra = (
+			frame_system::CheckVersion::<Runtime>::new(),
+			frame_system::CheckGenesis::<Runtime>::new(),
+			frame_system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
+			frame_system::CheckNonce::<Runtime>::from(index),
+			frame_system::CheckWeight::<Runtime>::new(),
+			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+			Default::default(),
+		);
+		let raw_payload = SignedPayload::new(call, extra).map_err(|e| {
+			debug::warn!("Unable to create signed payload: {:?}", e);
+		}).ok()?;
+		let signature = TSigner::sign(public, &raw_payload)?;
+		let address = Indices::unlookup(account);
+		let (call, extra, _) = raw_payload.deconstruct();
+		Some((call, (address, signature, extra)))
+	}
+}
+
 parameter_types! {
 	pub const ConfigDepositBase: Balance = 5 * DOLLARS;
 	pub const FriendDepositFactor: Balance = 50 * CENTS;
@@ -635,6 +679,7 @@ construct_runtime!(
 		Society: pallet_society::{Module, Call, Storage, Event<T>, Config<T>},
 		Recovery: pallet_recovery::{Module, Call, Storage, Event<T>},
 		Vesting: pallet_vesting::{Module, Call, Storage, Event<T>, Config<T>},
+		Bench: pallet_benchmark::{Module, Call, Storage, Event<T>},
 	}
 );
 
@@ -820,6 +865,7 @@ impl_runtime_apis! {
 			match module.as_slice() {
 				b"pallet-identity" | b"identity" => Identity::run_benchmark(extrinsic, steps, repeat),
 				b"pallet-staking" | b"staking" => Staking::run_benchmark(extrinsic, steps, repeat),
+				b"pallet-benchmark" | b"benchmark" => Bench::run_benchmark(extrinsic, steps, repeat),
 				_ => return Vec::new(),
 			}
 		}
