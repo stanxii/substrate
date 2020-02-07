@@ -277,7 +277,7 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 			let mode: BenchmarkingMode = BenchmarkingMode::StrongerSubmission;
 			let do_reduce: bool = true;
 			// select all of them
-			let to_elect: u32 = 10;
+			let to_elect: u32 = 200;
 
 
 			ValidatorCount::put(to_elect);
