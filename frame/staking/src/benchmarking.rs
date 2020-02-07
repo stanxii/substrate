@@ -265,6 +265,10 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 	fn run_benchmark(_extrinsic: Vec<u8>, _steps: u32, repeat: u32) -> Vec<BenchmarkResults> {
 		let mut results: Vec<BenchmarkResults> = Vec::new();
 
+		// warm up. why not.
+		sp_io::benchmarking::commit_db();
+		sp_io::benchmarking::wipe_db();
+
 		for r in 0..repeat {
 			// TODO: These are the parameters of the benchmark.
 			let num_validators = 300;

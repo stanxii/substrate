@@ -552,6 +552,10 @@ impl pallet_identity::Trait for Runtime {
 	type ForceOrigin = pallet_collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
 }
 
+impl pallet_benchmark::Trait for Runtime {
+	type Event = Event;
+}
+
 parameter_types! {
 	pub const ConfigDepositBase: Balance = 5 * DOLLARS;
 	pub const FriendDepositFactor: Balance = 50 * CENTS;
@@ -635,6 +639,7 @@ construct_runtime!(
 		Society: pallet_society::{Module, Call, Storage, Event<T>, Config<T>},
 		Recovery: pallet_recovery::{Module, Call, Storage, Event<T>},
 		Vesting: pallet_vesting::{Module, Call, Storage, Event<T>, Config<T>},
+		Bench: pallet_benchmark::{Module, Call, Storage, Event<T>},
 	}
 );
 
@@ -820,6 +825,7 @@ impl_runtime_apis! {
 			match module.as_slice() {
 				b"pallet-identity" | b"identity" => Identity::run_benchmark(extrinsic, steps, repeat),
 				b"pallet-staking" | b"staking" => Staking::run_benchmark(extrinsic, steps, repeat),
+				b"pallet-benchmark" | b"benchmark" => Bench::run_benchmark(extrinsic, steps, repeat),
 				_ => return Vec::new(),
 			}
 		}

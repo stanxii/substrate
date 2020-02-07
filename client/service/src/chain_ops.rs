@@ -78,15 +78,26 @@ pub fn benchmark_runtime<TBl, TExecDisp, G, E> (
 		&mut changes,
 		&executor,
 		"Benchmark_dispatch_benchmark",
-		&(pallet, extrinsic, steps, repeat).encode(),
+		&(&pallet, &extrinsic, steps, repeat).encode(),
 		Default::default(),
 	).execute(strategy).map_err(|e| format!("Error executing runtime benchmark: {:?}", e))?;
-	let result = <Vec<BenchmarkResults> as Decode>::decode(&mut &result[..]);
-	result.iter().enumerate().for_each(|(i, res)| {
-		println!("## Bench #{}", i);
-		res.iter().enumerate().for_each(|(j, r)| println!("{}\t{}", j, r.1.separated_string()));
-	});
-	info!("Done.");
+	let results = <Vec<BenchmarkResults> as Decode>::decode(&mut &result[..]).unwrap();
+	if results.len() == 0 {
+		info!("No Results.");
+	} else {
+		// Print benchmark metadata
+		println!("Pallet: {:?}, Extrinsic: {:?}, Steps: {:?}, Repeat: {:?}", pallet, extrinsic, steps, repeat);
+		// Print the table header
+		results[0].0.iter().for_each(|param| print!("{:?},", param.0));
+		print!("time,\n");
+		// Print the values
+		results.iter().for_each(|result| {
+			let parameters = &result.0;
+			parameters.iter().for_each(|param| print!("{:?},", param.1.separated_string()));
+			print!("{:?},\n", result.1);
+		});
+		info!("Done.");
+	}
 	Ok(())
 }
 

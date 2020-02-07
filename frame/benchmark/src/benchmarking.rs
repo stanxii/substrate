@@ -18,127 +18,111 @@
 
 use super::*;
 
+use codec::{Encode, Decode};
 use frame_system::RawOrigin;
 use sp_io::hashing::blake2_256;
 use sp_runtime::{BenchmarkResults, BenchmarkParameter};
-use sp_runtime::traits::{Bounded, Benchmarking, BenchmarkingSetup, Dispatchable};
+use sp_runtime::traits::{Benchmarking, BenchmarkingSetup, Dispatchable};
+use sp_std::prelude::*;
 
-use crate::Module as Identity;
+use crate::Module as Benchmark;
 
 fn account<T: Trait>(index: u32) -> T::AccountId {
 	let entropy = (b"benchmark", index).using_encoded(blake2_256);
 	T::AccountId::decode(&mut &entropy[..]).unwrap_or_default()
 }
 
-struct SetIdentity;
-impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for SetIdentity {
+// Custom implementation to handle benchmarking of calling a host function.
+fn time_host(steps: u32, repeat: u32) -> Vec<BenchmarkResults> {
+	let mut results: Vec<BenchmarkResults> = Vec::new();
 
-	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
-		vec![
-			// Registrar Count
-			(BenchmarkParameter::R, 1, 16),
-			// Additional Field Count
-			(BenchmarkParameter::X, 1, 20)
-		]
-	}
-
-	/// Assumes externalities are set up with a mutable state.
-	///
-	/// Panics if `component_name` isn't from `set_identity::components` or `component_value` is out of
-	/// the range of `set_identity::components`.
-	///
-	/// Sets up state randomly and returns a randomly generated `set_identity` with sensible (fixed)
-	/// values for all complexity components except those mentioned in the identity.
-	fn instance(&self, components: &[(BenchmarkParameter, u32)]) -> (crate::Call<T>, RawOrigin<T::AccountId>)
-	{
-		// Add r registrars
-		let r = components.iter().find(|&c| c.0 == BenchmarkParameter::R).unwrap();
-		for i in 0..r.1 {
-			let _ = T::Currency::make_free_balance_be(&account::<T>(i), BalanceOf::<T>::max_value());
-			assert_eq!(Identity::<T>::add_registrar(RawOrigin::Root.into(), account::<T>(i)), Ok(()));
-			assert_eq!(Identity::<T>::set_fee(RawOrigin::Signed(account::<T>(i)).into(), i.into(), 10.into()), Ok(()));
-			let fields = IdentityFields(IdentityField::Display | IdentityField::Legal);
-			assert_eq!(Identity::<T>::set_fields(RawOrigin::Signed(account::<T>(i)).into(), i.into(), fields), Ok(()));
+	for _ in 0..steps {
+		let start = sp_io::benchmarking::current_time();
+		for _ in 0..repeat {
+			let _ = sp_io::benchmarking::current_time();
 		}
+		let finish = sp_io::benchmarking::current_time();
+		let elapsed = finish - start;
 
-		// Create identity info with x additional fields
-		let x = components.iter().find(|&c| c.0 == BenchmarkParameter::X).unwrap();
-		// 32 byte data that we reuse below
-		let data = Data::Raw(vec![0; 32]);
-		let info = IdentityInfo {
-			additional: vec![(data.clone(), data.clone()); x.1 as usize],
-			display: data.clone(),
-			legal: data.clone(),
-			web: data.clone(),
-			riot: data.clone(),
-			email: data.clone(),
-			pgp_fingerprint: Some([0; 20]),
-			image: data.clone(),
-			twitter: data.clone(),
-		};
-
-		let caller = account::<T>(r.1 + 1);
-		let _ = T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value());
-
-		// Return the `set_identity` call
-		(crate::Call::<T>::set_identity(info), RawOrigin::Signed(caller))
+		results.push((vec![(BenchmarkParameter::L, repeat)], elapsed));
 	}
+
+	return results;
 }
 
-struct AddRegistrar;
-impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for AddRegistrar {
+struct AddMemberList;
+impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for AddMemberList {
 
 	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
 		vec![
 			// Registrar Count
-			(BenchmarkParameter::R, 1, 16),
+			(BenchmarkParameter::M, 1, 1000),
 		]
 	}
 
-	/// Assumes externalities are set up with a mutable state.
-	///
-	/// Panics if `component_name` isn't from `set_identity::components` or `component_value` is out of
-	/// the range of `set_identity::components`.
-	///
-	/// Sets up state randomly and returns a randomly generated `set_identity` with sensible (fixed)
-	/// values for all complexity components except those mentioned in the identity.
 	fn instance(&self, components: &[(BenchmarkParameter, u32)]) -> (crate::Call<T>, RawOrigin<T::AccountId>)
 	{
 		// Add r registrars
-		let r = components.iter().find(|&c| c.0 == BenchmarkParameter::R).unwrap();
+		let r = components.iter().find(|&c| c.0 == BenchmarkParameter::M).unwrap();
 		for i in 0..r.1 {
-			let _ = T::Currency::make_free_balance_be(&account::<T>(i), BalanceOf::<T>::max_value());
-			assert_eq!(Identity::<T>::add_registrar(RawOrigin::Root.into(), account::<T>(i)), Ok(()));
+			let _ = Benchmark::<T>::add_member_list(RawOrigin::Signed(account::<T>(i)).into());
 		}
 
 		sp_std::if_std!{
-			println!("# Registrars {:?}", Registrars::<T>::get().len());
+			println!("# Users {:?}", MyList::<T>::get().len());
 		}
 
 		// Return the `add_registrar` r + 1 call
-		(crate::Call::<T>::add_registrar(account::<T>(r.1 + 1)), RawOrigin::Root)
+		(crate::Call::<T>::add_member_list(), RawOrigin::Signed(account::<T>(r.1 + 1)))
+	}
+}
+
+struct AddMemberListAppend;
+impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for AddMemberListAppend {
+
+	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)> {
+		vec![
+			// Registrar Count
+			(BenchmarkParameter::M, 1, 1000),
+		]
+	}
+
+	fn instance(&self, components: &[(BenchmarkParameter, u32)]) -> (crate::Call<T>, RawOrigin<T::AccountId>)
+	{
+		// Add r registrars
+		let r = components.iter().find(|&c| c.0 == BenchmarkParameter::M).unwrap();
+		for i in 0..r.1 {
+			let _ = Benchmark::<T>::add_member_list_append(RawOrigin::Signed(account::<T>(i)).into());
+		}
+
+		sp_std::if_std!{
+			println!("# Users {:?}", MyList::<T>::get().len());
+		}
+
+		// Return the `add_registrar` r + 1 call
+		(crate::Call::<T>::add_member_list_append(), RawOrigin::Signed(account::<T>(r.1 + 1)))
 	}
 }
 
 enum SelectedBenchmark {
-	SetIdentity,
-	AddRegistrar,
+	AddMemberList,
+	AddMemberListAppend,
 }
 
 impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for SelectedBenchmark {
 	fn components(&self) -> Vec<(BenchmarkParameter, u32, u32)>
 	{
 		match self {
-			Self::SetIdentity => <SetIdentity as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&SetIdentity),
-			Self::AddRegistrar => <AddRegistrar as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&AddRegistrar),
+			Self::AddMemberList => <AddMemberList as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&AddMemberList),
+			Self::AddMemberListAppend => <AddMemberListAppend as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::components(&AddMemberListAppend),
 		}
 	}
 
 	fn instance(&self, components: &[(BenchmarkParameter, u32)]) -> (crate::Call<T>, RawOrigin<T::AccountId>)
 	{
 		match self {
-			Self::SetIdentity => <SetIdentity as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&SetIdentity, components),
-			Self::AddRegistrar => <AddRegistrar as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&AddRegistrar, components),
+			Self::AddMemberList => <AddMemberList as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&AddMemberList, components),
+			Self::AddMemberListAppend => <AddMemberListAppend as BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>>>::instance(&AddMemberListAppend, components),
 		}
 	}
 }
@@ -147,8 +131,9 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> {
 	fn run_benchmark(extrinsic: Vec<u8>, steps: u32, repeat: u32) -> Vec<BenchmarkResults> {
 
 		let selected_benchmark = match extrinsic.as_slice() {
-			b"set_identity" => SelectedBenchmark::SetIdentity,
-			b"add_registrar" => SelectedBenchmark::AddRegistrar,
+			b"time_host" => return benchmarking::time_host(steps, repeat),
+			b"add_member_list" => SelectedBenchmark::AddMemberList,
+			b"add_member_list_append" => SelectedBenchmark::AddMemberListAppend,
 			_ => return Vec::new(),
 		};
 
