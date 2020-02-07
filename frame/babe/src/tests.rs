@@ -94,7 +94,7 @@ fn first_block_epoch_zero_start() {
 
 		let authorities = Babe::authorities();
 		let consensus_log = sp_consensus_babe::ConsensusLog::NextEpochData(
-			sp_consensus_babe::NextEpochDescriptor {
+			sp_consensus_babe::digests::NextEpochDescriptor {
 				authorities,
 				randomness: Babe::randomness(),
 			}

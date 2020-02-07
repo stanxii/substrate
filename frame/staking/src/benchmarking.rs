@@ -215,6 +215,7 @@ fn clean<T: Trait>() {
 	<Ledger<T>>::remove_all();
 	<Bonded<T>>::remove_all();
 	<QueuedElected<T>>::kill();
+	QueuedScore::kill();
 }
 
 #[repr(u32)]
@@ -247,6 +248,9 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 			let edge_per_voter = 12;
 			let mode: BenchmarkingMode = BenchmarkingMode::StrongerSubmission;
 
+			// clean the state.
+			clean::<T>();
+
 			// stake and nominate everyone
 			setup_with_no_solution_on_chain::<T>(num_stakers, num_voters, edge_per_voter);
 
@@ -256,7 +260,7 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 					get_seq_phragmen_solution::<T>()
 				},
 				BenchmarkingMode::StrongerSubmission => {
-					let (winners, compact, score,) = get_weak_solution::<T>();
+					let (winners, compact, score) = get_weak_solution::<T>();
 					assert_ok!(
 						<Module<T>>::submit_election_solution(
 							signed_account::<T>(USER),
@@ -296,7 +300,6 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> where T::Lookup: Sta
 			let finish = sp_io::benchmarking::current_time();
 
 			results.push((Default::default(), finish - start));
-			clean::<T>();
 		}
 		results
 	}
