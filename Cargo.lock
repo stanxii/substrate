@@ -3884,6 +3884,7 @@ dependencies = [
 name = "pallet-authorship"
 version = "2.0.0-alpha.3"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "impl-trait-for-tuples",
@@ -4188,6 +4189,7 @@ dependencies = [
 name = "pallet-im-online"
 version = "2.0.0-alpha.3"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-authorship",
@@ -4487,6 +4489,7 @@ dependencies = [
 name = "pallet-utility"
 version = "2.0.0-alpha.3"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-balances",
