@@ -32,8 +32,6 @@ sp-runtime = { version = "2.0.0", path = "../../primitives/runtime" }
 sc-basic-authorship = { path = "../../client/basic-authorship" }
 structopt = "0.3.8"
 
-evm = { package = "pallet-evm", version = "2.0.0", default-features = false, path = "../../frame/evm" }
-
 [build-dependencies]
 vergen = "3.0.4"
 build-script-utils = { version = "2.0.0", package = "substrate-build-script-utils", path = "../../utils/build-script-utils" }

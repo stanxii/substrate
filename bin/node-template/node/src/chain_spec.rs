@@ -1,7 +1,7 @@
-use sp_core::{Blake2Hasher, Pair, Public, sr25519, U256};
+use sp_core::{Blake2Hasher, Pair, Public, sr25519};
 use node_template_runtime::{
-	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, SystemConfig, WASM_BINARY, Signature
+	AccountId, AuraConfig, BalancesConfig, EVMAccount, EVMConfig, GenesisConfig, GrandpaConfig,
+	IndicesConfig, SudoConfig, SystemConfig, WASM_BINARY, Signature
 };
 use sp_consensus_aura::sr25519::{AuthorityId as AuraId};
 use grandpa_primitives::{AuthorityId as GrandpaId};
@@ -124,6 +124,9 @@ fn testnet_genesis(initial_authorities: Vec<(AuraId, GrandpaId)>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool) -> GenesisConfig {
+
+	let alice_account_id = get_account_id_from_seed::<sr25519::Public>("Alice");
+	let alice_evm_account_id = HashTruncateConvertAccountId::<Blake2Hasher>::convert_account_id(&alice_account_id);
 
 	GenesisConfig {
 		system: Some(SystemConfig {

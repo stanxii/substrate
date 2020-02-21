@@ -241,6 +241,12 @@ impl evm::Trait for Runtime {
 	type Precompiles = ();
 }
 
+
+/// Used for the module template in `./template.rs`
+impl template::Trait for Runtime {
+	type Event = Event;
+}
+
 construct_runtime!(
 	pub enum Runtime where
 		Block = Block,
