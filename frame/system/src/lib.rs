@@ -90,36 +90,38 @@
 
 #[cfg(feature = "std")]
 use serde::Serialize;
-use sp_std::prelude::*;
+use sp_runtime::{
+	generic::{self, Era},
+	traits::{
+		self, AtLeast32Bit, BadOrigin, Bounded, CheckEqual, Dispatchable, EnsureOrigin, Hash,
+		Lookup, LookupError, MaybeDisplay, MaybeMallocSizeOf, MaybeSerialize,
+		MaybeSerializeDeserialize, Member, One, SaturatedConversion, SignedExtension, SimpleBitOps,
+		StaticLookup, Zero,
+	},
+	transaction_validity::{
+		InvalidTransaction, TransactionLongevity, TransactionPriority, TransactionValidity,
+		TransactionValidityError, ValidTransaction,
+	},
+	DispatchError, DispatchOutcome, Perbill, RuntimeDebug,
+};
+use sp_std::fmt::Debug;
 #[cfg(any(feature = "std", test))]
 use sp_std::map;
 use sp_std::marker::PhantomData;
-use sp_std::fmt::Debug;
+use sp_std::prelude::*;
 use sp_version::RuntimeVersion;
-use sp_runtime::{
-	RuntimeDebug, Perbill, DispatchOutcome, DispatchError,
-	generic::{self, Era},
-	transaction_validity::{
-		ValidTransaction, TransactionPriority, TransactionLongevity, TransactionValidityError,
-		InvalidTransaction, TransactionValidity,
-	},
-	traits::{
-		self, CheckEqual, AtLeast32Bit, Zero, SignedExtension, Lookup, LookupError,
-		SimpleBitOps, Hash, Member, MaybeDisplay, EnsureOrigin, BadOrigin, SaturatedConversion,
-		MaybeSerialize, MaybeSerializeDeserialize, MaybeMallocSizeOf, StaticLookup, One, Bounded,
-	},
-};
 
-use sp_core::{ChangesTrieConfiguration, storage::well_known_keys};
+use codec::{Decode, Encode, EncodeLike, FullCodec};
 use frame_support::{
-	decl_module, decl_event, decl_storage, decl_error, storage, Parameter,
+	decl_error, decl_event, decl_module, decl_storage, storage,
 	traits::{
-		Contains, Get, ModuleToIndex, OnNewAccount, OnReapAccount, IsDeadAccount, Happened,
-		StoredMap
+		Contains, Get, Happened, IsDeadAccount, ModuleToIndex, OnNewAccount, OnReapAccount,
+		StoredMap,
 	},
-	weights::{Weight, DispatchInfo, DispatchClass, SimpleDispatchInfo},
+	weights::{DispatchClass, DispatchInfo, GetDispatchInfo, SimpleDispatchInfo, Weight},
+	Parameter,
 };
-use codec::{Encode, Decode, FullCodec, EncodeLike};
+use sp_core::{storage::well_known_keys, ChangesTrieConfiguration};
 
 #[cfg(any(feature = "std", test))]
 use sp_io::TestExternalities;
@@ -144,7 +146,7 @@ pub trait Trait: 'static + Eq + Clone {
 		+ Clone;
 
 	/// The aggregated `Call` type.
-	type Call: Debug;
+	type Call: Debug + GetDispatchInfo + Dispatchable;
 
 	/// Account index (aka nonce) type. This stores the number of previous transactions associated
 	/// with a sender account.
@@ -303,6 +305,9 @@ decl_storage! {
 
 		/// Total weight for all extrinsics put together, for the current block.
 		AllExtrinsicsWeight: Option<Weight>;
+
+		/// The weight taken by the current executing disptachable.
+		CurrentDispatchableWeight: Option<Weight>;
 
 		/// Total length (in bytes) for all extrinsics put together, for the current block.
 		AllExtrinsicsLen: Option<u32>;
@@ -923,33 +928,41 @@ impl<T: Trait> Module<T> {
 	}
 }
 
-pub trait Dispatcher {
+impl<T: Trait> Module<T> {
+	pub fn spent_weight() -> Option<Weight> {
+		CurrentDispatchableWeight::get()
+	}
+
 	/// Decrease the amount of weight consumed by the current dispatchable.
 	///
 	/// This function can only meaningfully called within `Self::dispatch`. Otherwise,
 	/// it does nothing and returns `Err`.
 	///
 	/// The total weight returned from the dispatchable cannot exceed its total requested weight.
-	fn return_unspent_weight(unspent: Weight) -> Result<(), ()>;
-
-	/// Dispatch a given `Dispatchable` with a given origin.
-	fn dispatch<D: sp_runtime::traits::Dispatchable>(
-		origin: D::Origin,
-		dispatchable: D,
-	) -> (Weight, sp_runtime::DispatchResult);
-}
-
-impl<T: Trait> Dispatcher for Module<T> {
-	fn return_unspent_weight(unspent: Weight) -> Result<(), ()> {
-		todo!()
+	pub fn return_unspent_weight(unspent: Weight) -> Result<(), ()> {
+		let weight = match CurrentDispatchableWeight::take() {
+			None => return Err(()),
+			Some(weight) => weight,
+		};
+		let next_weight = weight.checked_sub(unspent).ok_or(())?;
+		CurrentDispatchableWeight::put(next_weight);
+		Ok(())
 	}
 
-	/// Dispatch a given `Dispatchable` with a given origin.
-	fn dispatch<D: sp_runtime::traits::Dispatchable>(
-		origin: D::Origin,
-		dispatchable: D,
+	/// Dispatch a given `T::Call` with a given origin.
+	///
+	/// Returns how much weight was unspent.
+	pub fn dispatch_call(
+		origin: <T::Call as Dispatchable>::Origin,
+		call: T::Call,
 	) -> (Weight, sp_runtime::DispatchResult) {
-		todo!()
+		let original_weight = call.get_dispatch_info().weight;
+		CurrentDispatchableWeight::put(original_weight);
+		let result = call.dispatch(origin);
+		// TODO: This won't work with the nested calls.
+		let spent_weight = CurrentDispatchableWeight::take().unwrap_or_default();
+		let unspent_weight = original_weight.saturating_sub(spent_weight);
+		(unspent_weight, result)
 	}
 }
 
@@ -1154,7 +1167,20 @@ impl<T: Trait + Send + Sync> SignedExtension for CheckWeight<T> {
 			return Err(e);
 		}
 
-		Ok(ValidTransaction { priority: Self::get_priority(info), ..Default::default() })
+		Ok(ValidTransaction {
+			priority: Self::get_priority(info),
+			..Default::default()
+		})
+	}
+
+	fn post_dispatch(_pre: Self::Pre, info: Self::DispatchInfo, _len: usize) {
+		let spent = CurrentDispatchableWeight::get().unwrap_or_default();
+		let reserved = info.weight;
+		let unspent = spent - reserved;
+		AllExtrinsicsWeight::mutate(|weight| {
+			let next_weight = weight.map(|weight| weight - unspent);
+			*weight = next_weight;
+		});
 	}
 }
 

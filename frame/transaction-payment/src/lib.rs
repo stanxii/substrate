@@ -31,22 +31,22 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use sp_std::prelude::*;
-use codec::{Encode, Decode};
+use codec::{Decode, Encode};
 use frame_support::{
-	decl_storage, decl_module,
-	traits::{Currency, Get, OnUnbalanced, ExistenceRequirement, WithdrawReason},
-	weights::{Weight, DispatchInfo, GetDispatchInfo},
-};
-use sp_runtime::{
-	Fixed64,
-	transaction_validity::{
-		TransactionPriority, ValidTransaction, InvalidTransaction, TransactionValidityError,
-		TransactionValidity,
-	},
-	traits::{Zero, Saturating, SignedExtension, SaturatedConversion, Convert},
+	decl_module, decl_storage,
+	traits::{Currency, ExistenceRequirement, Get, Imbalance, OnUnbalanced, WithdrawReason},
+	weights::{DispatchInfo, GetDispatchInfo, Weight},
 };
 use pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
+use sp_runtime::{
+	traits::{Convert, SaturatedConversion, Saturating, SignedExtension, Zero},
+	transaction_validity::{
+		InvalidTransaction, TransactionPriority, TransactionValidity, TransactionValidityError,
+		ValidTransaction,
+	},
+	Fixed64,
+};
+use sp_std::prelude::*;
 
 type Multiplier = Fixed64;
 type BalanceOf<T> =
@@ -126,6 +126,12 @@ impl<T: Trait> Module<T> {
 	}
 }
 
+/// Data which is collected during the pre-dispatch phase and needed at the post_dispatch phase.
+pub struct PendingRefund<AccountId, NegativeImbalance> {
+	transactor: AccountId,
+	imbalance: NegativeImbalance,
+}
+
 /// Require the transactor pay for themselves and maybe include a tip to gain additional priority
 /// in the queue.
 #[derive(Encode, Decode, Clone, Eq, PartialEq)]
@@ -183,6 +189,35 @@ impl<T: Trait + Send + Sync> ChargeTransactionPayment<T> {
 			tip
 		}
 	}
+
+	fn withdraw_fee(
+		who: &T::AccountId,
+		tip: BalanceOf<T>,
+		fee: BalanceOf<T>,
+	) -> Result<Option<PendingRefund<T::AccountId, NegativeImbalanceOf<T>>>, ()> {
+		// Only mess with balances if fee is not zero.
+		if !fee.is_zero() {
+			let imbalance = match T::Currency::withdraw(
+				who,
+				fee,
+				if tip.is_zero() {
+					WithdrawReason::TransactionPayment.into()
+				} else {
+					WithdrawReason::TransactionPayment | WithdrawReason::Tip
+				},
+				ExistenceRequirement::KeepAlive,
+			) {
+				Ok(imbalance) => imbalance,
+				Err(_) => return Err(()),
+			};
+			Ok(Some(PendingRefund {
+				transactor: who.clone(),
+				imbalance,
+			}))
+		} else {
+			Ok(None)
+		}
+	}
 }
 
 impl<T: Trait + Send + Sync> sp_std::fmt::Debug for ChargeTransactionPayment<T> {
@@ -197,15 +232,30 @@ impl<T: Trait + Send + Sync> sp_std::fmt::Debug for ChargeTransactionPayment<T> 
 }
 
 impl<T: Trait + Send + Sync> SignedExtension for ChargeTransactionPayment<T>
-	where BalanceOf<T>: Send + Sync
+where
+	BalanceOf<T>: Send + Sync,
 {
 	const IDENTIFIER: &'static str = "ChargeTransactionPayment";
 	type AccountId = T::AccountId;
 	type Call = T::Call;
 	type AdditionalSigned = ();
 	type DispatchInfo = DispatchInfo;
-	type Pre = ();
-	fn additional_signed(&self) -> sp_std::result::Result<(), TransactionValidityError> { Ok(()) }
+	type Pre = Option<PendingRefund<T::AccountId, NegativeImbalanceOf<T>>>;
+	fn additional_signed(&self) -> sp_std::result::Result<(), TransactionValidityError> {
+		Ok(())
+	}
+
+	fn pre_dispatch(
+		self,
+		who: &Self::AccountId,
+		_call: &Self::Call,
+		info: Self::DispatchInfo,
+		len: usize,
+	) -> Result<Self::Pre, TransactionValidityError> {
+		let tip = self.0;
+		let fee = Self::compute_fee(len as u32, info, tip);
+		Self::withdraw_fee(who, tip, fee).map_err(|()| InvalidTransaction::Payment.into())
+	}
 
 	fn validate(
 		&self,
@@ -214,32 +264,40 @@ impl<T: Trait + Send + Sync> SignedExtension for ChargeTransactionPayment<T>
 		info: Self::DispatchInfo,
 		len: usize,
 	) -> TransactionValidity {
-		// pay any fees.
 		let tip = self.0;
 		let fee = Self::compute_fee(len as u32, info, tip);
-		// Only mess with balances if fee is not zero.
-		if !fee.is_zero() {
-			let imbalance = match T::Currency::withdraw(
-				who,
-				fee,
-				if tip.is_zero() {
-					WithdrawReason::TransactionPayment.into()
-				} else {
-					WithdrawReason::TransactionPayment | WithdrawReason::Tip
-				},
-				ExistenceRequirement::KeepAlive,
-			) {
-				Ok(imbalance) => imbalance,
-				Err(_) => return InvalidTransaction::Payment.into(),
-			};
-			T::OnTransactionPayment::on_unbalanced(imbalance);
-		}
+		let _ = Self::withdraw_fee(who, tip, fee)
+			.map_err(|()| TransactionValidityError::from(InvalidTransaction::Payment))?;
 
 		let mut r = ValidTransaction::default();
 		// NOTE: we probably want to maximize the _fee (of any type) per weight unit_ here, which
 		// will be a bit more than setting the priority to tip. For now, this is enough.
 		r.priority = fee.saturated_into::<TransactionPriority>();
 		Ok(r)
+	}
+
+	fn post_dispatch(
+		pre: Option<PendingRefund<T::AccountId, NegativeImbalanceOf<T>>>,
+		_info: Self::DispatchInfo,
+		_len: usize,
+	) {
+		let (transactor, imbalance) = match pre {
+			Some(PendingRefund {
+				transactor,
+				imbalance,
+			}) => (transactor, imbalance),
+			_ => return,
+		};
+
+		let actual_weight_fee = <frame_system::Module<T>>::spent_weight()
+			.map(|spent| T::WeightToFee::convert(spent))
+			.unwrap_or_default();
+		let refund = imbalance.peek().saturating_sub(actual_weight_fee);
+
+		let refund_imbalance = T::Currency::deposit_creating(&transactor, refund);
+		if let Ok(imbalance) = imbalance.offset(refund_imbalance) {
+			T::OnTransactionPayment::on_unbalanced(imbalance);
+		}
 	}
 }
 
