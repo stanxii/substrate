@@ -637,7 +637,8 @@ pub trait TestNetFactory: Sized {
 			protocol_id: ProtocolId::from(&b"test-protocol-name"[..]),
 			import_queue,
 			specialization: self::SpecializationFactory::create(),
-			block_announce_validator: Box::new(DefaultBlockAnnounceValidator::new(client.clone()))
+			block_announce_validator: Box::new(DefaultBlockAnnounceValidator::new(client.clone())),
+			metrics_registry: None,
 		}).unwrap();
 
 		self.mut_peers(|peers| {
@@ -713,7 +714,8 @@ pub trait TestNetFactory: Sized {
 			protocol_id: ProtocolId::from(&b"test-protocol-name"[..]),
 			import_queue,
 			specialization: self::SpecializationFactory::create(),
-			block_announce_validator: Box::new(DefaultBlockAnnounceValidator::new(client.clone()))
+			block_announce_validator: Box::new(DefaultBlockAnnounceValidator::new(client.clone())),
+			metrics_registry: None,
 		}).unwrap();
 
 		self.mut_peers(|peers| {

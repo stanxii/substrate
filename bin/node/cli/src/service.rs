@@ -233,13 +233,14 @@ macro_rules! new_full {
 			(true, false) => {
 				// start the full GRANDPA voter
 				let grandpa_config = grandpa::GrandpaParams {
-					config: config,
+					config,
 					link: grandpa_link,
 					network: service.network(),
 					inherent_data_providers: inherent_data_providers.clone(),
 					on_exit: service.on_exit(),
 					telemetry_on_connect: Some(service.telemetry_on_connect_stream()),
 					voting_rule: grandpa::VotingRulesBuilder::default().build(),
+					prometheus_registry: service.prometheus_registry(),
 				};
 				// the GRANDPA voter task is considered infallible, i.e.
 				// if it fails we take down the service with it.

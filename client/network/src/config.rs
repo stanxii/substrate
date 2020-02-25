@@ -35,6 +35,7 @@ use core::{fmt, iter};
 use std::{future::Future, pin::Pin};
 use std::{error::Error, fs, io::{self, Write}, net::Ipv4Addr, path::{Path, PathBuf}, sync::Arc};
 use zeroize::Zeroize;
+use prometheus_exporter::Registry;
 
 /// Network initialization parameters.
 pub struct Params<B: BlockT, S, H: ExHashT> {
@@ -87,6 +88,9 @@ pub struct Params<B: BlockT, S, H: ExHashT> {
 
 	/// Type to check incoming block announcements.
 	pub block_announce_validator: Box<dyn BlockAnnounceValidator<B> + Send>,
+
+	/// Registry for recording prometheus metrics to.
+	pub metrics_registry: Option<Registry>,
 }
 
 bitflags! {
