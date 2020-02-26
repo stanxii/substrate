@@ -122,6 +122,8 @@ pub struct Configuration<G, E = NoExtension> {
 	pub tracing_targets: Option<String>,
 	/// Tracing receiver
 	pub tracing_receiver: sc_tracing::TracingReceiver,
+	/// Use default block announcement
+	pub default_announce_block: bool,
 }
 
 /// Configuration of the client keystore.
@@ -201,6 +203,7 @@ impl<G, E> Default for Configuration<G, E> {
 			dev_key_seed: None,
 			tracing_targets: Default::default(),
 			tracing_receiver: Default::default(),
+			default_announce_block: true,
 		}
 	}
 }
