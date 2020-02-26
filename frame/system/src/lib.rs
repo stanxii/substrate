@@ -940,10 +940,7 @@ impl<T: Trait> Module<T> {
 	///
 	/// The total weight returned from the dispatchable cannot exceed its total requested weight.
 	pub fn return_unspent_weight(unspent: Weight) -> Result<(), ()> {
-		let weight = match CurrentDispatchableWeight::take() {
-			None => return Err(()),
-			Some(weight) => weight,
-		};
+		let weight = CurrentDispatchableWeight::take().ok_or(())?;
 		let next_weight = weight.checked_sub(unspent).ok_or(())?;
 		CurrentDispatchableWeight::put(next_weight);
 		Ok(())
