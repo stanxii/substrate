@@ -164,7 +164,7 @@ impl ExtrinsicT for Extrinsic {
 
 impl Dispatchable for Extrinsic {
 	type Origin = Origin;
-	type Trait;
+	type Trait = Runtime;
 	/// Actually dispatch this call and result the result of it.
 	fn dispatch(self, origin: Self::Origin) -> sp_runtime::DispatchResult {
 		todo!()
