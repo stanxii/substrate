@@ -146,7 +146,7 @@ pub trait Trait: 'static + Eq + Clone {
 		+ Clone;
 
 	/// The aggregated `Call` type.
-	type Call: Debug + GetDispatchInfo + Dispatchable;
+	type Call: Debug;
 
 	/// Account index (aka nonce) type. This stores the number of previous transactions associated
 	/// with a sender account.
@@ -945,20 +945,36 @@ impl<T: Trait> Module<T> {
 		CurrentDispatchableWeight::put(next_weight);
 		Ok(())
 	}
+}
 
+impl<T: Trait> Module<T>
+where
+	<T as Trait>::Call: GetDispatchInfo + Dispatchable,
+{
 	/// Dispatch a given `T::Call` with a given origin.
 	///
-	/// Returns how much weight was unspent.
+	/// Returns how much weight was actually unspent by the call.
 	pub fn dispatch_call(
 		origin: <T::Call as Dispatchable>::Origin,
 		call: T::Call,
 	) -> (Weight, sp_runtime::DispatchResult) {
-		let original_weight = call.get_dispatch_info().weight;
-		CurrentDispatchableWeight::put(original_weight);
+		// First, replace the current weight counter with the incoming call weight.
+		let prev_weight = CurrentDispatchableWeight::get();
+		let call_weight = call.get_dispatch_info().weight;
+		CurrentDispatchableWeight::put(call_weight);
+
+		// Then, dispatch the call.
 		let result = call.dispatch(origin);
-		// TODO: This won't work with the nested calls.
+
+		// Finally, get the actual spent weight.
 		let spent_weight = CurrentDispatchableWeight::take().unwrap_or_default();
-		let unspent_weight = original_weight.saturating_sub(spent_weight);
+		if let Some(prev_weight) = prev_weight {
+			CurrentDispatchableWeight::put(prev_weight);
+		} else {
+			CurrentDispatchableWeight::kill();
+		}
+
+		let unspent_weight = call_weight.saturating_sub(spent_weight);
 		(unspent_weight, result)
 	}
 }
@@ -1171,7 +1187,7 @@ impl<T: Trait + Send + Sync> SignedExtension for CheckWeight<T> {
 	}
 
 	fn post_dispatch(_pre: Self::Pre, info: Self::DispatchInfo, _len: usize) {
-		let spent = CurrentDispatchableWeight::get().unwrap_or_default();
+		let spent = CurrentDispatchableWeight::get().unwrap_or(info.weight);
 		let reserved = info.weight;
 		let unspent = spent - reserved;
 		AllExtrinsicsWeight::mutate(|weight| {
