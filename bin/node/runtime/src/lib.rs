@@ -825,15 +825,15 @@ impl_runtime_apis! {
 		) -> Result<Vec<frame_benchmarking::BenchmarkResults>, RuntimeString> {
 			use frame_benchmarking::Benchmarking;
 
-			match module.as_slice() {
-				b"pallet-balances" | b"balances" => Balances::run_benchmark(extrinsic, steps, repeat).ok(),
-				b"pallet-identity" | b"identity" => Identity::run_benchmark(extrinsic, steps, repeat).ok(),
-				b"pallet-timestamp" | b"timestamp" => Timestamp::run_benchmark(extrinsic, steps, repeat).ok(),
-				b"pallet-authorship" | b"authorship" => Authorship::run_benchmark(extrinsic, steps, repeat).ok(),
-				b"pallet-im-online" | b"im-online" => ImOnline::run_benchmark(extrinsic, steps, repeat).ok(),
-				b"pallet-utility" | b"utility" => Utility::run_benchmark(extrinsic, steps, repeat).ok(),
+			let result = match module.as_slice() {
+				b"pallet-balances" | b"balances" => Balances::run_benchmark(extrinsic, steps, repeat),
+				b"pallet-identity" | b"identity" => Identity::run_benchmark(extrinsic, steps, repeat),
+				b"pallet-timestamp" | b"timestamp" => Timestamp::run_benchmark(extrinsic, steps, repeat),
+				b"pallet-authorship" | b"authorship" => Authorship::run_benchmark(extrinsic, steps, repeat),
+				b"pallet-im-online" | b"im-online" => ImOnline::run_benchmark(extrinsic, steps, repeat),
+				b"pallet-utility" | b"utility" => Utility::run_benchmark(extrinsic, steps, repeat),
 				_ => Err("Benchmark not found for this pallet."),
-			}
+			};
 			result.map_err(|e| e.into())
 		}
 	}

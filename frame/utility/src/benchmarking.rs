@@ -111,15 +111,4 @@ benchmarks! {
         Some(timepoint),
         call_hash
     )
-
-        Ok((
-            crate::Call::<T>::approve_as_multi(
-                threshold,
-                other_signatories,
-                Some(timepoint),
-                call_hash,
-            ),
-            RawOrigin::Signed(account::<T>("Alfred J. Kwak", 9999)),
-        ))
-    }
 }
