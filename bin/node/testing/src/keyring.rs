@@ -62,6 +62,7 @@ pub fn to_session_keys(
 		babe: sr25519_keyring.to_owned().public().into(),
 		im_online: sr25519_keyring.to_owned().public().into(),
 		authority_discovery: sr25519_keyring.to_owned().public().into(),
+		staking: sr25519_keyring.to_owned().public().into(),
 	}
 }
 
@@ -74,6 +75,7 @@ pub fn signed_extra(nonce: Index, extra_fee: Balance) -> SignedExtra {
 		frame_system::CheckNonce::from(nonce),
 		frame_system::CheckWeight::new(),
 		pallet_transaction_payment::ChargeTransactionPayment::from(extra_fee),
+		Default::default(),
 		Default::default(),
 	)
 }

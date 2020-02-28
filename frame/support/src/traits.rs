@@ -24,7 +24,7 @@ use sp_core::u32_trait::Value as U32;
 use sp_runtime::{
 	RuntimeDebug,
 	ConsensusEngineId, DispatchResult, DispatchError,
-	traits::{MaybeSerializeDeserialize, AtLeast32Bit, Saturating, TrailingZeroInput},
+	traits::{MaybeSerializeDeserialize, AtLeast32Bit, Saturating, TrailingZeroInput, Bounded},
 };
 
 use crate::dispatch::Parameter;
@@ -135,6 +135,19 @@ impl<
 			}
 			v
 		})
+	}
+}
+
+/// Something that can predict at which block number the next era change will happen.
+pub trait EstimateNextSessionChange<BlockNumber> {
+	/// Return the block number at which the next era change will happen.
+	fn estimate_next_session_change(now: BlockNumber) -> BlockNumber;
+}
+
+impl<BlockNumber: Bounded> EstimateNextSessionChange<BlockNumber> for () {
+	fn estimate_next_session_change(_: BlockNumber) -> BlockNumber {
+		// practically never
+		Bounded::max_value()
 	}
 }
 
