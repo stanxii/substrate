@@ -85,7 +85,7 @@ impl<T: Trait> BenchmarkingSetup<T, crate::Call<T>, RawOrigin<T::AccountId>> for
 }
 
 impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> {
-	fn run_benchmark(extrinsic: Vec<u8>, steps: u32, repeat: u32) -> Result<Vec<BenchmarkResults>, &'static str> {
+	fn run_benchmark(extrinsic: Vec<u8>, steps: Vec<u32>, repeat: u32) -> Result<Vec<BenchmarkResults>, &'static str> {
 		// Map the input to the selected benchmark.
 		let selected_benchmark = match extrinsic.as_slice() {
 			b"set_uncles" => SelectedBenchmark::SetUncles,
@@ -101,11 +101,15 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> {
 		// results go here
 		let mut results: Vec<BenchmarkResults> = Vec::new();
 		// Select the component we will be benchmarking. Each component will be benchmarked.
-		for (name, low, high) in components.iter() {
+		for (idx, (name, low, high)) in components.iter().enumerate() {
+			
+			let steps = steps.get(idx).unwrap_or(&0);
+
 			// Create up to `STEPS` steps for that component between high and low.
 			let step_size = ((high - low) / steps).max(1);
 			let num_of_steps = (high - low) / step_size;
 			for s in 0..num_of_steps {
+
 				// This is the value we will be testing for component `name`
 				let component_value = low + step_size * s;
 
@@ -123,11 +127,24 @@ impl<T: Trait> Benchmarking<BenchmarkResults> for Module<T> {
 					// This will enable worst case scenario for reading from the database.
 					benchmarking::commit_db();
 					// Run the benchmark.
-					let start = benchmarking::current_time();
-					call.dispatch(caller.into())?;
-					let finish = benchmarking::current_time();
-					let elapsed = finish - start;
-					results.push((c.clone(), elapsed));
+					let elapsed_extrinsic = {
+						let start = benchmarking::current_time();
+						call.dispatch(caller.into())?;
+						let finish = benchmarking::current_time();
+						finish - start
+					};
+
+					let elapsed_storage_root = {
+						#[doc(hidden)]
+						use sp_io::storage::root as storage_root;
+
+						let start = benchmarking::current_time();
+						storage_root();
+						let finish = benchmarking::current_time();
+						finish - start
+					};
+
+					results.push((c.clone(), elapsed_extrinsic, elapsed_storage_root));
 					// Wipe the DB back to the genesis state.
 					benchmarking::wipe_db();
 				}
