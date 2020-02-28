@@ -34,6 +34,10 @@ pub fn rerun_if_git_head_changed() {
 			return
 		}
 
+		if manifest_dir.join(".buildtrigger").exists() {
+			println!("cargo:rerun-if-changed={}", manifest_dir.join(".buildtrigger").display());
+		}
+			
 		manifest_dir.pop();
 	}
 
