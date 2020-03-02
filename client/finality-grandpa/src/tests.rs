@@ -190,17 +190,6 @@ impl TestNetFactory for GrandpaTestNet {
 	}
 }
 
-#[derive(Clone)]
-struct Exit;
-
-impl futures::Future for Exit {
-	type Output = ();
-
-	fn poll(self: Pin<&mut Self>, _: &mut task::Context) -> task::Poll<()> {
-		task::Poll::Pending
-	}
-}
-
 #[derive(Default, Clone)]
 pub(crate) struct TestApi {
 	genesis_authorities: AuthorityList,
@@ -444,7 +433,6 @@ fn run_to_completion_with<F>(
 			link: link,
 			network: net_service,
 			inherent_data_providers: InherentDataProviders::new(),
-			on_exit: Exit,
 			telemetry_on_connect: None,
 			voting_rule: (),
 		};
@@ -575,7 +563,6 @@ fn finalize_3_voters_1_full_observer() {
 			link: link,
 			network: net_service,
 			inherent_data_providers: InherentDataProviders::new(),
-			on_exit: Exit,
 			telemetry_on_connect: None,
 			voting_rule: (),
 		};
@@ -738,7 +725,6 @@ fn transition_3_voters_twice_1_full_observer() {
 			link: link,
 			network: net_service,
 			inherent_data_providers: InherentDataProviders::new(),
-			on_exit: Exit,
 			telemetry_on_connect: None,
 			voting_rule: (),
 		};
@@ -1163,7 +1149,6 @@ fn voter_persists_its_votes() {
 							link,
 							network: this.net.lock().peers[0].network_service().clone(),
 							inherent_data_providers: InherentDataProviders::new(),
-							on_exit: Exit,
 							telemetry_on_connect: None,
 							voting_rule: VotingRulesBuilder::default().build(),
 						};
@@ -1378,7 +1363,6 @@ fn finalize_3_voters_1_light_observer() {
 				},
 				link,
 				net.lock().peers[3].network_service().clone(),
-				Exit,
 			).unwrap()
 		);
 
@@ -1508,7 +1492,6 @@ fn voter_catches_up_to_latest_round_when_behind() {
 			link,
 			network: net.lock().peer(peer_id).network_service().clone(),
 			inherent_data_providers: InherentDataProviders::new(),
-			on_exit: Exit,
 			telemetry_on_connect: None,
 			voting_rule: (),
 		};
