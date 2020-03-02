@@ -29,12 +29,20 @@ use frame_benchmarking::benchmarks;
 use sp_io::hashing::blake2_256;
 use sp_runtime::traits::{Dispatchable, Hash, BlakeTwo256};
 use core::convert::TryInto;
+use frame_support::{
+	decl_module, decl_event, decl_storage, ensure, decl_error,
+	traits::{Currency, ReservableCurrency, OnUnbalanced, Get, BalanceStatus},
+	weights::SimpleDispatchInfo,
+};
+use sp_runtime::traits::Bounded;
 
 use crate::Module as Utility;
 
+type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
+
 // Support Functions
 fn account<T: Trait>(name: &'static str, index: u32) -> T::AccountId {
-    let entropy = (name, index).using_encoded(blake2_256);
+    let entropy = index.using_encoded(blake2_256);
     T::AccountId::decode(&mut &entropy[..]).unwrap_or_default()
 }
 
@@ -91,10 +99,29 @@ benchmarks! {
         let t in ...;
 
         let signatories_count : u32 = s.try_into().unwrap();
-        let other_signatories = (1u32..=signatories_count).into_iter().map(|idx| account::<T>("Tester", idx))
+        let mut other_signatories = (1u32..=signatories_count).into_iter()
+            .map(|idx| account::<T>("Tester", idx))
             .take(signatories_count.try_into().unwrap())
             .collect::<Vec<_>>();
+        
+        other_signatories.push(account::<T>("Alfred J. Kwak", 9999));
+        other_signatories.push(account::<T>("Peter Pan", 1981));
+        
+        other_signatories.iter().for_each(|account| {
+            let _ = T::Currency::make_free_balance_be(&account, BalanceOf::<T>::max_value());
+        });
 
+        // sort, because that is what's required by ApproveAsMulti's other_siganatories field
+        other_signatories.sort();
+
+        let first = other_signatories.pop().unwrap();
+        let second = other_signatories.pop().unwrap();
+        use sp_std;
+        sp_std::if_std! {
+            println!("first {}", first);
+            println!("second {}", second);
+        }
+    
         let threshold : u16 = t.try_into().unwrap();
         let timepoint : Timepoint<T::BlockNumber> = Utility::<T>::timepoint();
 
@@ -103,12 +130,13 @@ benchmarks! {
         let call_hash = BlakeTwo256::hash_of(&call);
         let call_hash : [u8;32] = call_hash.as_ref().try_into().expect("Signature length mismatch");
 
-        call.dispatch(RawOrigin::Signed(account::<T>("Peter Pan", 1981)).into())?;
+        call.dispatch(RawOrigin::Signed(second).into())?;
+
     } : _(
-        RawOrigin::Signed(account::<T>("Alfred J. Kwak", 9999)),
+        RawOrigin::Signed(first),
         threshold,
         other_signatories,
-        Some(timepoint),
+        None, //Some(timepoint),
         call_hash
     )
 }
