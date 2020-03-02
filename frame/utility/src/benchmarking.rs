@@ -55,15 +55,13 @@ benchmarks! {
         let n in 0 .. 64 => { n };
         let i in 0 .. 64 => { i };
         let a in 0 .. 64 => { a };
-        let s in 0 .. 64 => { s };
-        let t in 0 .. 64 => { t };
+        let t in 2 .. 64 => { t };
     }
 
     batch {
         let n in ...;
         let i in _ .. _ => ();
         let a in _ .. _ => ();
-        let s in _ .. _ => ();
         let t in _ .. _ => ();
 
 
@@ -80,7 +78,6 @@ benchmarks! {
         let n in _ .. _ => ();
         let i in ...;
         let a in ...;
-        let s in _ .. _ => ();
         let t in _ .. _ => ();
 
         let idx : u16 = i.try_into().unwrap();
@@ -95,10 +92,20 @@ benchmarks! {
         let n in _ .. _ => ();
         let i in _ .. _ => ();
         let a in _ .. _ => ();
-        let s in ...;
         let t in ...;
 
-        let signatories_count : u32 = s.try_into().unwrap();
+        // TODO verify this utilizes the heaviest path in ApproveAsMulti
+
+        // the only valid path is in case the number of signatories matches the threshold
+        // even too many will error
+        let threshold : u16 = t.try_into().unwrap();      
+        let signatories_count : u32 = threshold.try_into().unwrap();
+        
+        use sp_std;
+        sp_std::if_std!{
+            println!("must get {} of {} where there are {}", threshold, <T as Trait>::MaxSignatories::get(), signatories_count);
+        }
+
         let mut other_signatories = (1u32..=signatories_count).into_iter()
             .map(|idx| account::<T>("Tester", idx))
             .take(signatories_count.try_into().unwrap())
@@ -107,6 +114,7 @@ benchmarks! {
         other_signatories.push(account::<T>("Alfred J. Kwak", 9999));
         other_signatories.push(account::<T>("Peter Pan", 1981));
         
+        // make sure all accounts have sufficient funds
         other_signatories.iter().for_each(|account| {
             let _ = T::Currency::make_free_balance_be(&account, BalanceOf::<T>::max_value());
         });
@@ -114,26 +122,21 @@ benchmarks! {
         // sort, because that is what's required by ApproveAsMulti's other_siganatories field
         other_signatories.sort();
 
-        let first = other_signatories.pop().unwrap();
-        let second = other_signatories.pop().unwrap();
-        use sp_std;
-        sp_std::if_std! {
-            println!("first {}", first);
-            println!("second {}", second);
-        }
-    
-        let threshold : u16 = t.try_into().unwrap();
+        let author = other_signatories.pop().unwrap();
+        let collective = other_signatories.pop().unwrap();
+
         let timepoint : Timepoint<T::BlockNumber> = Utility::<T>::timepoint();
 
         let call : <T as Trait>::Call = nop_call::<T>();
 
+        // the reference to be used in the multisig call
         let call_hash = BlakeTwo256::hash_of(&call);
         let call_hash : [u8;32] = call_hash.as_ref().try_into().expect("Signature length mismatch");
 
-        call.dispatch(RawOrigin::Signed(second).into())?;
+        call.dispatch(RawOrigin::Signed(author).into())?;
 
     } : _(
-        RawOrigin::Signed(first),
+        RawOrigin::Signed(collective),
         threshold,
         other_signatories,
         None, //Some(timepoint),
