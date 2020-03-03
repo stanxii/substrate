@@ -15,7 +15,7 @@ use sp_runtime::{
 	impl_opaque_keys, MultiSignature,
 };
 use sp_runtime::traits::{
-	NumberFor, BlakeTwo256, Block as BlockT, IdentityLookup, Verify, ConvertInto, IdentifyAccount
+	BlakeTwo256, Block as BlockT, IdentityLookup, Verify, ConvertInto, IdentifyAccount
 };
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
